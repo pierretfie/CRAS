@@ -183,7 +183,7 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
     const eventType: "progress" | "regress" | "won" | "lost" =
       mode === "won" ? "won" : mode === "lost" ? "lost" : toStage > client.current_stage ? "progress" : "regress";
 
-    const update: Record<string, unknown> = {};
+    const update: { status?: "active" | "won" | "lost"; current_stage?: number; stage_value?: number; lost_reason?: string; stage_notes?: string } = {};
     if (mode === "won") { update.status = "won"; update.current_stage = 3; update.stage_value = 1; }
     else if (mode === "lost") { update.status = "lost"; update.lost_reason = reason; }
     else { update.current_stage = toStage; update.stage_value = stageVal; update.stage_notes = description; }
