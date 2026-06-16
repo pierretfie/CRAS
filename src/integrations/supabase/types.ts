@@ -14,16 +14,261 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      admin_categories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      client_interactions: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          note: string | null
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_interactions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_stage_events: {
+        Row: {
+          client_id: string
+          created_at: string
+          description: string
+          event_type: Database["public"]["Enums"]["stage_event_type"]
+          from_stage: number | null
+          id: string
+          lost_reason: string | null
+          stage_value: number | null
+          to_stage: number | null
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          description: string
+          event_type: Database["public"]["Enums"]["stage_event_type"]
+          from_stage?: number | null
+          id?: string
+          lost_reason?: string | null
+          stage_value?: number | null
+          to_stage?: number | null
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          description?: string
+          event_type?: Database["public"]["Enums"]["stage_event_type"]
+          from_stage?: number | null
+          id?: string
+          lost_reason?: string | null
+          stage_value?: number | null
+          to_stage?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_stage_events_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clients: {
+        Row: {
+          category: string
+          contact_person: string | null
+          created_at: string
+          created_by: string
+          current_stage: number
+          custom_fields: Json
+          email: string | null
+          id: string
+          location: string | null
+          lost_reason: string | null
+          mode_of_connection: string
+          name: string
+          stage_label: string | null
+          stage_notes: string | null
+          stage_value: number
+          status: Database["public"]["Enums"]["client_status"]
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          contact_person?: string | null
+          created_at?: string
+          created_by: string
+          current_stage?: number
+          custom_fields?: Json
+          email?: string | null
+          id?: string
+          location?: string | null
+          lost_reason?: string | null
+          mode_of_connection: string
+          name: string
+          stage_label?: string | null
+          stage_notes?: string | null
+          stage_value?: number
+          status?: Database["public"]["Enums"]["client_status"]
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          contact_person?: string | null
+          created_at?: string
+          created_by?: string
+          current_stage?: number
+          custom_fields?: Json
+          email?: string | null
+          id?: string
+          location?: string | null
+          lost_reason?: string | null
+          mode_of_connection?: string
+          name?: string
+          stage_label?: string | null
+          stage_notes?: string | null
+          stage_value?: number
+          status?: Database["public"]["Enums"]["client_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      conversion_stage_config: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          label: string
+          stage_number: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          label: string
+          stage_number: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          label?: string
+          stage_number?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          active: boolean
+          created_at: string
+          department: string | null
+          email: string
+          id: string
+          must_change_password: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          department?: string | null
+          email: string
+          id: string
+          must_change_password?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          department?: string | null
+          email?: string
+          id?: string
+          must_change_password?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
+      client_status: "active" | "won" | "lost"
+      stage_event_type: "progress" | "regress" | "note" | "won" | "lost"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +395,10 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+      client_status: ["active", "won", "lost"],
+      stage_event_type: ["progress", "regress", "note", "won", "lost"],
+    },
   },
 } as const
