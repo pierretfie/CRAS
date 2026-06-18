@@ -32,6 +32,24 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_products: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       client_interactions: {
         Row: {
           client_id: string
@@ -125,6 +143,7 @@ export type Database = {
           lost_reason: string | null
           mode_of_connection: string
           name: string
+          product: string | null
           stage_label: string | null
           stage_notes: string | null
           stage_value: number
@@ -144,6 +163,7 @@ export type Database = {
           lost_reason?: string | null
           mode_of_connection: string
           name: string
+          product?: string | null
           stage_label?: string | null
           stage_notes?: string | null
           stage_value?: number
@@ -163,6 +183,7 @@ export type Database = {
           lost_reason?: string | null
           mode_of_connection?: string
           name?: string
+          product?: string | null
           stage_label?: string | null
           stage_notes?: string | null
           stage_value?: number
