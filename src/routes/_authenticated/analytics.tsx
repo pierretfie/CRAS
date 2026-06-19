@@ -19,6 +19,7 @@ import {
   Legend,
 } from "recharts";
 import { TrendingUp, Users, Trophy, AlertTriangle, MessageSquareText } from "lucide-react";
+import type { ChartConfig } from "@/components/ui/chart";
 
 export const Route = createFileRoute("/_authenticated/analytics")({
   component: AnalyticsPage,
@@ -27,6 +28,11 @@ export const Route = createFileRoute("/_authenticated/analytics")({
 const RED = "oklch(0.62 0.23 25)";
 const RED_MUTED = "oklch(0.45 0.15 25)";
 const WHITE = "oklch(0.95 0 0)";
+const NEUTRAL = "oklch(0.62 0.05 260)";
+
+const productChartConfig: ChartConfig = {
+  value: { label: "Clients", color: NEUTRAL },
+};
 
 function AnalyticsPage() {
   const { data, isLoading } = useAnalyticsData();
@@ -38,6 +44,19 @@ function AnalyticsPage() {
   const conv = (data.conversion * 100).toFixed(1);
   const modeData = Object.entries(data.byMode).map(([name, value]) => ({ name, value }));
   const catData = Object.entries(data.byCategory).map(([name, value]) => ({ name, value }));
+
+  const productTotal = Object.values(data.byProduct).reduce((a: number, b: number) => a + b, 0) || 1;
+  const productData = Object.entries(data.byProduct)
+    .map(([name, value]) => ({ name, value: value as number, pct: Math.round(((value as number) / productTotal) * 100) }))
+    .sort((a, b) => b.value - a.value);
+
+  const wonByProductData = Object.entries(data.wonByProduct)
+    .map(([name, value]) => ({ name, value: value as number, pct: Math.round(((value as number) / productTotal) * 100) }))
+    .sort((a, b) => b.value - a.value);
+
+  const enquiredByProductData = Object.entries(data.enquiredByProduct)
+    .map(([name, value]) => ({ name, value: value as number, pct: Math.round(((value as number) / productTotal) * 100) }))
+    .sort((a, b) => b.value - a.value);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -118,6 +137,51 @@ function AnalyticsPage() {
                 <Tooltip contentStyle={{ background: "oklch(0.20 0.012 260)", border: "1px solid oklch(0.28 0.01 260)" }} />
                 <Line type="monotone" dataKey="count" stroke={RED} strokeWidth={2} dot={{ fill: RED }} />
               </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Products</CardTitle><CardDescription>All clients per product</CardDescription></CardHeader>
+          <CardContent style={{ height: 280 }}>
+            <ResponsiveContainer>
+              <BarChart data={productData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.30 0.01 260)" />
+                <XAxis type="number" stroke={WHITE} allowDecimals={false} />
+                <YAxis type="category" dataKey="name" stroke={WHITE} width={100} />
+                <Tooltip contentStyle={{ background: "oklch(0.20 0.012 260)", border: "1px solid oklch(0.28 0.01 260)" }} />
+                <Bar dataKey="value" fill={RED} radius={[0, 6, 6, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Sold by Product</CardTitle><CardDescription>Won clients per product</CardDescription></CardHeader>
+          <CardContent style={{ height: 280 }}>
+            <ResponsiveContainer>
+              <BarChart data={wonByProductData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.30 0.01 260)" />
+                <XAxis type="number" stroke={WHITE} allowDecimals={false} />
+                <YAxis type="category" dataKey="name" stroke={WHITE} width={100} />
+                <Tooltip contentStyle={{ background: "oklch(0.20 0.012 260)", border: "1px solid oklch(0.28 0.01 260)" }} />
+                <Bar dataKey="value" fill={RED} radius={[0, 6, 6, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Enquired by Product</CardTitle><CardDescription>Active clients per product</CardDescription></CardHeader>
+          <CardContent style={{ height: 280 }}>
+            <ResponsiveContainer>
+              <BarChart data={enquiredByProductData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.30 0.01 260)" />
+                <XAxis type="number" stroke={WHITE} allowDecimals={false} />
+                <YAxis type="category" dataKey="name" stroke={WHITE} width={100} />
+                <Tooltip contentStyle={{ background: "oklch(0.20 0.012 260)", border: "1px solid oklch(0.28 0.01 260)" }} />
+                <Bar dataKey="value" fill={RED} radius={[0, 6, 6, 0]} />
+              </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
