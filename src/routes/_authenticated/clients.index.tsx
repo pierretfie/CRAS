@@ -29,8 +29,29 @@ function ClientsList() {
     },
   });
 
+  const { data: products } = useQuery({
+    queryKey: ["admin_products"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("admin_products")
+        .select("*")
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const [productFilter, setProductFilter] = useState("all");
+
   const filtered = (data ?? []).filter((c) => {
     if (status !== "all" && c.status !== status) return false;
+    if (productFilter !== "all") {
+      if (productFilter === "__unspecified__") {
+        if (c.product != null) return false;
+      } else if (c.product !== productFilter) {
+        return false;
+      }
+    }
     if (!q.trim()) return true;
     const t = q.toLowerCase();
     return c.name.toLowerCase().includes(t) || c.category.toLowerCase().includes(t) || c.mode_of_connection.toLowerCase().includes(t);
@@ -54,12 +75,22 @@ function ClientsList() {
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search clients…" className="pl-9" />
         </div>
         <Select value={status} onValueChange={(v) => setStatus(v as typeof status)}>
-          <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-[140px]"><SelectValue placeholder="All statuses" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All</SelectItem>
             <SelectItem value="active">Active</SelectItem>
             <SelectItem value="won">Won</SelectItem>
             <SelectItem value="lost">Lost</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={productFilter} onValueChange={(v) => setProductFilter(v)}>
+          <SelectTrigger className="w-[160px]"><SelectValue placeholder="All products" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All products</SelectItem>
+            <SelectItem value="__unspecified__">Unspecified</SelectItem>
+            {products?.map((p: { id: string; name: string }) => (
+              <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -77,7 +108,7 @@ function ClientsList() {
                   <div className="min-w-0 flex-1">
                     <div className="font-semibold truncate">{c.name}</div>
                     <div className="text-xs text-muted-foreground truncate">
-                      {c.category} · {c.mode_of_connection} {c.contact_person ? `· ${c.contact_person}` : ""}
+                      {c.category} · {c.product ?? "—"} · {c.mode_of_connection} {c.contact_person ? `· ${c.contact_person}` : ""}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
