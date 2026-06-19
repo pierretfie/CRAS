@@ -26,6 +26,10 @@ function NewClient() {
     queryKey: ["admin_categories"],
     queryFn: async () => (await supabase.from("admin_categories").select("*").order("name")).data ?? [],
   });
+  const { data: products } = useQuery({
+    queryKey: ["admin_products"],
+    queryFn: async () => (await supabase.from("admin_products").select("*").order("name")).data ?? [],
+  });
   const { data: stages } = useQuery({
     queryKey: ["stage_config"],
     queryFn: async () => (await supabase.from("conversion_stage_config").select("*").order("stage_number")).data ?? [],
@@ -40,6 +44,8 @@ function NewClient() {
     customCategory: "",
     mode: "",
     customMode: "",
+    product: "",
+    customProduct: "",
     stage: 1,
     stage_notes: "",
   });
@@ -89,6 +95,7 @@ function NewClient() {
       stage_value: preview.stageValue,
       stage_label: preview.stageLabel ?? null,
       stage_notes: form.stage_notes,
+      product: form.customProduct.trim() || form.product || null,
       custom_fields: cf,
       created_by: u.user.id,
     }).select("id").single();
@@ -138,6 +145,16 @@ function NewClient() {
       <Card>
         <CardHeader><CardTitle>Classification</CardTitle><CardDescription>Pick from presets or add your own</CardDescription></CardHeader>
         <CardContent className="grid md:grid-cols-2 gap-4">
+          <Field label="Product">
+            <Select value={form.product} onValueChange={(v) => set("product", v)}>
+              <SelectTrigger><SelectValue placeholder="Pick or type custom" /></SelectTrigger>
+              <SelectContent>
+                {products?.map((p) => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Input className="mt-2" placeholder="Or type custom" value={form.customProduct} onChange={(e) => set("customProduct", e.target.value)} />
+          </Field>
+
           <Field label="Category">
             <Select value={form.category} onValueChange={(v) => set("category", v)}>
               <SelectTrigger><SelectValue placeholder="Pick or type custom" /></SelectTrigger>

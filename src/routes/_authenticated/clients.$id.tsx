@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
@@ -22,7 +22,6 @@ const LOST_REASONS = ["Price", "Timing", "Competitor", "Unresponsive", "Out of s
 
 function ClientDetail() {
   const { id } = Route.useParams();
-  const navigate = useNavigate();
   const qc = useQueryClient();
 
   const { data: client, refetch } = useQuery({
@@ -49,6 +48,7 @@ function ClientDetail() {
             <Badge variant="outline">Stage {client.current_stage}{client.stage_label ? ` · ${client.stage_label}` : ""}</Badge>
             <Badge variant={client.status === "won" ? "default" : client.status === "lost" ? "destructive" : "secondary"}>{client.status}</Badge>
             <Badge variant="outline">{client.category}</Badge>
+            {client.product && <Badge variant="outline">{client.product}</Badge>}
             <Badge variant="outline">{client.mode_of_connection}</Badge>
           </div>
         </div>
@@ -66,6 +66,7 @@ function ClientDetail() {
           <Detail k="Email" v={client.email} />
           <Detail k="Location" v={client.location} />
           <Detail k="Contact Person" v={client.contact_person} />
+          <Detail k="Product" v={client.product} />
           <Detail k="Stage Value" v={String(client.stage_value)} />
           {client.lost_reason && <Detail k="Lost Reason" v={client.lost_reason} />}
           <Detail k="Created" v={new Date(client.created_at).toLocaleDateString()} />
@@ -104,7 +105,7 @@ function ClientDetail() {
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-muted-foreground">No events yet.</p>
+            <p className="text-sm text-muted-foreground">No events yet</p>
           )}
         </CardContent>
       </Card>
@@ -121,23 +122,31 @@ function Detail({ k, v }: { k: string; v: string | null | undefined }) {
   );
 }
 
-function EditClientDialog({ client, onSaved }: { client: { id: string; name: string; email: string | null; location: string | null; contact_person: string | null }; onSaved: () => void }) {
+function EditClientDialog({ client, onSaved }: { client: { id: string; name: string; email: string | null; location: string | null; contact_person: string | null; product: string | null }; onSaved: () => void }) {
   const [open, setOpen] = useState(false);
+  const { data: products } = useQuery({
+    queryKey: ["admin_products"],
+    queryFn: async () => (await supabase.from("admin_products").select("*").order("name")).data ?? [],
+  });
   const [form, setForm] = useState({
     name: client.name,
     email: client.email ?? "",
     location: client.location ?? "",
     contact_person: client.contact_person ?? "",
+    product: client.product ?? "",
+    customProduct: "",
   });
   const [saving, setSaving] = useState(false);
 
   async function save() {
     setSaving(true);
+    const newProduct = form.customProduct.trim() || form.product || null;
     const { error } = await supabase.from("clients").update({
       name: form.name,
       email: form.email || null,
       location: form.location || null,
       contact_person: form.contact_person || null,
+      product: newProduct,
     }).eq("id", client.id);
     setSaving(false);
     if (error) return toast.error(error.message);
@@ -148,16 +157,49 @@ function EditClientDialog({ client, onSaved }: { client: { id: string; name: str
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button variant="outline" size="sm"><Edit className="h-4 w-4 mr-1" />Edit</Button></DialogTrigger>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm"><Edit className="h-4 w-4 mr-1" />Edit</Button>
+      </DialogTrigger>
       <DialogContent>
         <DialogHeader><DialogTitle>Edit Client Details</DialogTitle></DialogHeader>
         <div className="space-y-3">
-          <div className="space-y-1"><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-          <div className="space-y-1"><Label>Email</Label><Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-          <div className="space-y-1"><Label>Location</Label><Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} /></div>
-          <div className="space-y-1"><Label>Contact Person</Label><Input value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} /></div>
+          <div className="space-y-1">
+            <Label>Name</Label>
+            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          </div>
+          <div className="space-y-1">
+            <Label>Email</Label>
+            <Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+          </div>
+          <div className="space-y-1">
+            <Label>Location</Label>
+            <Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
+          </div>
+          <div className="space-y-1">
+            <Label>Contact Person</Label>
+            <Input value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} />
+          </div>
+          <div className="space-y-1">
+            <Label>Product</Label>
+            <Select value={form.product} onValueChange={(v) => setForm({ ...form, product: v })}>
+              <SelectTrigger><SelectValue placeholder="Pick or type custom" /></SelectTrigger>
+              <SelectContent>
+                {products?.map((p: { id: string; name: string }) => (
+                  <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
+              className="mt-2"
+              placeholder="Or type custom"
+              value={form.customProduct}
+              onChange={(e) => setForm({ ...form, customProduct: e.target.value })}
+            />
+          </div>
         </div>
-        <DialogFooter><Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button></DialogFooter>
+        <DialogFooter>
+          <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -211,11 +253,13 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button size="sm"><TrendingUp className="h-4 w-4 mr-1" />Update Stage</Button></DialogTrigger>
+      <DialogTrigger asChild>
+        <Button size="sm"><TrendingUp className="h-4 w-4 mr-1" />Update Stage</Button>
+      </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Update Stage</DialogTitle>
-          <DialogDescription>Describe what happened. Mark Won when onboarded, Lost when negotiations break down.</DialogDescription>
+          <DialogDescription>Describe what happened. Mark Won when onboarded, Lost when negotiations break down</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
@@ -253,7 +297,7 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
           )}
 
           <div className="space-y-1">
-            <Label>What happened?</Label>
+            <Label>What happened</Label>
             <Textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe the update…" />
           </div>
         </div>
