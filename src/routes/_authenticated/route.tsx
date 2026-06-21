@@ -1,10 +1,13 @@
 import { createFileRoute, Outlet, redirect, useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
+import { query } from "@/lib/db";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { LogOut, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useAIDrawer } from "@/hooks/use-ai-drawer";
+import { AIAssistantDrawer } from "@/components/ai-assistant-drawer";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -19,16 +22,14 @@ export const Route = createFileRoute("/_authenticated")({
 function AuthedLayout() {
   const navigate = useNavigate();
   const [checking, setChecking] = useState(true);
+  const { toggle } = useAIDrawer();
 
   useEffect(() => {
     (async () => {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) return;
-      const { data: p } = await supabase
-        .from("profiles")
-        .select("must_change_password")
-        .eq("id", u.user.id)
-        .maybeSingle();
+      const { data: pData } = await query('SELECT must_change_password FROM profiles WHERE id = $1', [u.user.id]);
+      const p = (pData as any[])?.length > 0 ? (pData as any[])[0] : null;
       if (p?.must_change_password) {
         navigate({ to: "/change-password" });
         return;
@@ -69,6 +70,7 @@ function AuthedLayout() {
           </main>
         </SidebarInset>
       </div>
+      <AIAssistantDrawer />
     </SidebarProvider>
   );
 }

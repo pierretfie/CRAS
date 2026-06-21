@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { query } from "@/lib/db";
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,20 +21,17 @@ function ClientsList() {
   const { data, isLoading } = useQuery({
     queryKey: ["clients"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("clients")
-        .select("*")
-        .order("updated_at", { ascending: false });
-      if (error) throw error;
-      return data;
+      const res = await query('SELECT * FROM clients ORDER BY updated_at DESC');
+      if (res.error) throw res.error;
+      return res.data;
     },
   });
 
-  const filtered = (data ?? []).filter((c) => {
+  const filtered = (data ?? []).filter((c: any) => {
     if (status !== "all" && c.status !== status) return false;
     if (!q.trim()) return true;
     const t = q.toLowerCase();
-    return c.name.toLowerCase().includes(t) || c.category.toLowerCase().includes(t) || c.mode_of_connection.toLowerCase().includes(t);
+    return c.name.toLowerCase().includes(t) || c.category.toLowerCase().includes(t) || c.mode_of_connection.toLowerCase().includes(t) || (c.contact_person ?? "").toLowerCase().includes(t);
   });
 
   return (
@@ -70,18 +68,26 @@ function ClientsList() {
         <Card><CardContent className="p-8 text-center text-muted-foreground">No clients yet. Add your first.</CardContent></Card>
       ) : (
         <div className="grid gap-2">
-          {filtered.map((c) => (
+          {filtered.map((c: any) => {
+            const contactParts = [c.contact_person, c.contact_person_role].filter(Boolean);
+            const contactLabel = contactParts.length > 0 ? `· ${contactParts.join(" — ")}` : "";
+            return (
             <Link key={c.id} to="/clients/$id" params={{ id: c.id }} className="block">
               <Card className="hover:border-primary/50 transition-colors">
                 <CardContent className="p-4 flex items-center justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     <div className="font-semibold truncate">{c.name}</div>
                     <div className="text-xs text-muted-foreground truncate">
-                      {c.category} · {c.mode_of_connection} {c.contact_person ? `· ${c.contact_person}` : ""}
+                      {c.category} · {c.mode_of_connection} {contactLabel}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <Badge variant="outline">Stage {c.current_stage}</Badge>
+                    <Badge variant="outline" className={
+                      c.current_stage === 1 ? "border-stage-1/30 text-stage-1 bg-stage-1/10" :
+                      c.current_stage === 2 ? "border-stage-2/30 text-stage-2 bg-stage-2/10" :
+                      c.current_stage === 3 ? "border-stage-3/30 text-stage-3 bg-stage-3/10" :
+                      ""
+                    }>Stage {c.current_stage}</Badge>
                     <Badge
                       variant={c.status === "won" ? "default" : c.status === "lost" ? "destructive" : "secondary"}
                     >
@@ -91,7 +97,8 @@ function ClientsList() {
                 </CardContent>
               </Card>
             </Link>
-          ))}
+          );
+          })}
         </div>
       )}
     </div>

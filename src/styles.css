@@ -43,6 +43,9 @@
   --color-sidebar-ring: var(--sidebar-ring);
   --color-success: var(--success);
   --color-warning: var(--warning);
+  --color-stage-1: var(--stage-1);
+  --color-stage-2: var(--stage-2);
+  --color-stage-3: var(--stage-3);
 }
 
 /* Dark charcoal + white + red — single theme, applied always */
@@ -75,6 +78,9 @@
 
   --success: oklch(0.70 0.16 150);
   --warning: oklch(0.78 0.17 80);
+  --stage-1: oklch(0.62 0.23 25);
+  --stage-2: oklch(0.76 0.17 65);
+  --stage-3: oklch(0.65 0.19 145);
 
   --border: oklch(0.28 0.01 260);
   --input: oklch(0.26 0.01 260);

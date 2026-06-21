@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { query } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,7 +29,7 @@ function ChangePassword() {
     }
     const { data: u } = await supabase.auth.getUser();
     if (u.user) {
-      await supabase.from("profiles").update({ must_change_password: false }).eq("id", u.user.id);
+      await query('UPDATE profiles SET must_change_password = false WHERE id = $1', [u.user.id]);
     }
     setLoading(false);
     toast.success("Password updated");
@@ -38,7 +39,7 @@ function ChangePassword() {
   async function skip() {
     const { data: u } = await supabase.auth.getUser();
     if (u.user) {
-      await supabase.from("profiles").update({ must_change_password: false }).eq("id", u.user.id);
+      await query('UPDATE profiles SET must_change_password = false WHERE id = $1', [u.user.id]);
     }
     navigate({ to: "/analytics" });
   }

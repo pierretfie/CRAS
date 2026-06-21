@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { query } from "@/lib/db";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,10 +11,11 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2, Send, Bot, User, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { useAnalyticsData } from "@/hooks/use-analytics-data";
-import { mockChat } from "@/lib/ai-mock";
+import { Markdown } from "@/components/markdown";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   component: AdminPage,
@@ -58,31 +60,170 @@ function AdminPage() {
 }
 
 function UsersTab() {
+  const qc = useQueryClient();
   const { data: users, refetch } = useQuery({
     queryKey: ["all-profiles"],
-    queryFn: async () => (await supabase.from("profiles").select("*").order("created_at", { ascending: false })).data ?? [],
+    queryFn: async () => {
+      const [{ data: profiles }, { data: roles }] = await Promise.all([
+        query('SELECT * FROM profiles ORDER BY created_at DESC'),
+        query('SELECT * FROM user_roles'),
+      ]);
+      if (!profiles) return [];
+      const roleMap = new Map<string, string[]>();
+      for (const r of (roles ?? []) as { user_id: string; role: string }[]) {
+        const cur = roleMap.get(r.user_id) ?? [];
+        cur.push(r.role);
+        roleMap.set(r.user_id, cur);
+      }
+      return (profiles as any[]).map((p) => ({ ...p, roles: roleMap.get(p.id) ?? [] }));
+    },
   });
+
+  // Create user form
+  const [showCreate, setShowCreate] = useState(false);
+  const [createForm, setCreateForm] = useState({ name: "", email: "", department: "", role: "user" as "admin" | "user" });
+  const [creating, setCreating] = useState(false);
+  const [createdResult, setCreatedResult] = useState<{ email: string; generatedPassword: string } | null>(null);
+
+  async function handleCreate() {
+    if (!createForm.name.trim() || !createForm.email.trim()) return toast.error("Name and email required");
+    setCreating(true);
+    try {
+      const { adminCreateUser } = await import("@/lib/api/admin.functions");
+      const result = await adminCreateUser({
+        data: {
+          name: createForm.name.trim(),
+          email: createForm.email.trim(),
+          department: createForm.department.trim() || undefined,
+          role: createForm.role,
+        },
+      });
+      setCreatedResult({ email: result.email, generatedPassword: result.generatedPassword });
+      setCreateForm({ name: "", email: "", department: "", role: "user" });
+      toast.success("User created");
+      refetch();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message ?? "Failed to create user");
+    } finally {
+      setCreating(false);
+    }
+  }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Workspace users</CardTitle>
-        <CardDescription>To add a user, share the signup link. They sign up themselves; you can later promote.</CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Workspace Users</CardTitle>
+            <CardDescription>Create users and manage roles</CardDescription>
+          </div>
+          <Button size="sm" onClick={() => { setShowCreate(!showCreate); setCreatedResult(null); }}>
+            <Plus className="h-4 w-4 mr-1" />{showCreate ? "Cancel" : "Create User"}
+          </Button>
+        </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        {/* Created user credentials display */}
+        {createdResult && (
+          <div className="rounded-lg border border-primary/40 bg-primary/5 p-4 space-y-2">
+            <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+              <ShieldAlert className="h-4 w-4" />
+              User Created — Share These Credentials
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div>
+                <span className="text-muted-foreground">Email:</span>{" "}
+                <span className="font-mono font-medium">{createdResult.email}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Password:</span>{" "}
+                <span className="font-mono font-medium">{createdResult.generatedPassword}</span>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">The user will be prompted to change this password on first login.</p>
+            <Button size="sm" variant="outline" onClick={() => setCreatedResult(null)}>Dismiss</Button>
+          </div>
+        )}
+
+        {/* Create user form */}
+        {showCreate && (
+          <div className="rounded-lg border p-4 space-y-3">
+            <div className="grid md:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Full Name *</Label>
+                <Input value={createForm.name} onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })} placeholder="John Doe" />
+              </div>
+              <div className="space-y-1">
+                <Label>Email *</Label>
+                <Input type="email" value={createForm.email} onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })} placeholder="john@company.com" />
+              </div>
+              <div className="space-y-1">
+                <Label>Department</Label>
+                <Input value={createForm.department} onChange={(e) => setCreateForm({ ...createForm, department: e.target.value })} placeholder="Sales / BD / Marketing" />
+              </div>
+              <div className="space-y-1">
+                <Label>Role</Label>
+                <Select value={createForm.role} onValueChange={(v) => setCreateForm({ ...createForm, role: v as "admin" | "user" })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">User</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">A random password will be generated. Share it with the user — they'll be asked to change it on first login.</p>
+            <Button onClick={handleCreate} disabled={creating}>{creating ? "Creating…" : "Create User"}</Button>
+          </div>
+        )}
+
+        {/* User list */}
         <div className="space-y-2">
-          {users?.map((u) => (
+          {users?.map((u: any) => (
             <div key={u.id} className="flex items-center justify-between border-b border-border pb-2 last:border-0">
               <div>
-                <div className="font-medium">{u.name}</div>
+                <div className="font-medium flex items-center gap-2">
+                  {u.name}
+                  {u.roles?.includes("admin") && <Badge variant="default" className="text-xs">Admin</Badge>}
+                  {!u.active && <Badge variant="destructive" className="text-xs">Inactive</Badge>}
+                </div>
                 <div className="text-xs text-muted-foreground">{u.email} · {u.department ?? "—"}</div>
               </div>
-              <Button size="sm" variant="outline" onClick={async () => {
-                const { error } = await supabase.from("user_roles").insert({ user_id: u.id, role: "admin" });
-                if (error) toast.error(error.message); else { toast.success("Promoted to admin"); refetch(); }
-              }}>
-                Promote to Admin
-              </Button>
+              <div className="flex gap-1">
+                {!u.roles?.includes("admin") && (
+                  <Button size="sm" variant="outline" onClick={async () => {
+                    try {
+                      const res = await query('INSERT INTO user_roles (user_id, role) VALUES ($1, $2)', [u.id, 'admin']);
+                      if (res.error) throw res.error;
+                      toast.success("Promoted to admin");
+                      refetch();
+                    } catch (err: any) {
+                      console.error(err);
+                      toast.error(err.message ?? "Failed to promote");
+                    }
+                  }}>
+                    Promote
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant={u.active ? "ghost" : "outline"}
+                  onClick={async () => {
+                    try {
+                      const { adminToggleUserActive } = await import("@/lib/api/admin.functions");
+                      await adminToggleUserActive({ data: { userId: u.id, active: !u.active } });
+                      toast.success(u.active ? "User deactivated" : "User activated");
+                      refetch();
+                    } catch (err: any) {
+                      console.error(err);
+                      toast.error(err.message ?? "Failed to update user");
+                    }
+                  }}
+                >
+                  {u.active ? "Deactivate" : "Activate"}
+                </Button>
+              </div>
             </div>
           ))}
           {!users?.length && <p className="text-sm text-muted-foreground">No users yet.</p>}
@@ -92,23 +233,41 @@ function UsersTab() {
   );
 }
 
+
 function CategoriesTab() {
   const qc = useQueryClient();
   const { data: cats } = useQuery({
     queryKey: ["admin_categories"],
-    queryFn: async () => (await supabase.from("admin_categories").select("*").order("name")).data ?? [],
+    queryFn: async () => {
+      const res = await query('SELECT * FROM admin_categories ORDER BY name');
+      if (res.error) throw res.error;
+      return res.data;
+    },
   });
   const [name, setName] = useState("");
 
   async function add() {
     if (!name.trim()) return;
-    const { error } = await supabase.from("admin_categories").insert({ name: name.trim() });
-    if (error) toast.error(error.message);
-    else { setName(""); qc.invalidateQueries({ queryKey: ["admin_categories"] }); }
+    try {
+      const res = await query('INSERT INTO admin_categories (name) VALUES ($1)', [name.trim()]);
+      if (res.error) throw res.error;
+      setName("");
+      qc.invalidateQueries({ queryKey: ["admin_categories"] });
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message ?? "Failed to add category");
+    }
   }
+
   async function del(id: string) {
-    await supabase.from("admin_categories").delete().eq("id", id);
-    qc.invalidateQueries({ queryKey: ["admin_categories"] });
+    try {
+      const res = await query('DELETE FROM admin_categories WHERE id = $1', [id]);
+      if (res.error) throw res.error;
+      qc.invalidateQueries({ queryKey: ["admin_categories"] });
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message ?? "Failed to delete category");
+    }
   }
 
   return (
@@ -120,7 +279,7 @@ function CategoriesTab() {
           <Button onClick={add}><Plus className="h-4 w-4 mr-1" />Add</Button>
         </div>
         <div className="space-y-1">
-          {cats?.map((c) => (
+          {cats?.map((c: any) => (
             <div key={c.id} className="flex items-center justify-between border-b border-border pb-1">
               <span>{c.name}</span>
               <Button size="icon" variant="ghost" onClick={() => del(c.id)}><Trash2 className="h-4 w-4" /></Button>
@@ -136,19 +295,41 @@ function StagesTab() {
   const qc = useQueryClient();
   const { data: stages } = useQuery({
     queryKey: ["stage_config"],
-    queryFn: async () => (await supabase.from("conversion_stage_config").select("*").order("stage_number")).data ?? [],
+    queryFn: async () => {
+      const res = await query('SELECT * FROM conversion_stage_config ORDER BY stage_number');
+      if (res.error) throw res.error;
+      return res.data;
+    },
   });
 
   async function update(id: string, patch: Partial<{ label: string; description: string }>) {
-    await supabase.from("conversion_stage_config").update(patch).eq("id", id);
-    qc.invalidateQueries({ queryKey: ["stage_config"] });
+    try {
+      let setClause = '';
+      const values: any[] = [];
+      if (patch.label !== undefined) {
+        setClause += 'label = $' + (values.length + 1);
+        values.push(patch.label);
+      }
+      if (patch.description !== undefined) {
+        if (setClause) setClause += ', ';
+        setClause += 'description = $' + (values.length + 1);
+        values.push(patch.description);
+      }
+      if (setClause === '') return; // nothing to update
+      const res = await query(`UPDATE conversion_stage_config SET ${setClause} WHERE id = $${values.length + 1}`, [...values, id]);
+      if (res.error) throw res.error;
+      qc.invalidateQueries({ queryKey: ["stage_config"] });
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message ?? "Failed to update stage");
+    }
   }
 
   return (
     <Card>
       <CardHeader><CardTitle>Conversion Stages</CardTitle><CardDescription>Edit labels and descriptions</CardDescription></CardHeader>
       <CardContent className="space-y-4">
-        {stages?.map((s) => (
+        {stages?.map((s: any) => (
           <div key={s.id} className="space-y-2 p-3 border border-border rounded-lg">
             <div className="flex items-center gap-2">
               <Badge variant="outline">Stage {s.stage_number}</Badge>
@@ -189,26 +370,66 @@ function ConsoleTab() {
     setInput("");
     setStreaming(true);
     try {
-      const stream = mockChat([...messages, u].map((m) => ({ role: m.role, content: m.content })), analytics as unknown as Record<string, unknown>);
-      for await (const chunk of stream) {
-        setMessages((prev) => {
-          const c = [...prev];
-          c[c.length - 1] = { ...c[c.length - 1], content: c[c.length - 1].content + chunk };
-          return c;
-        });
-      }
+      // Try real AI first
+      const { aiChatComplete } = await import("@/lib/api/ai.functions");
+      const analyticsContext = `Total clients: ${analytics.total}\nConversion rate: ${(analytics.conversion * 100).toFixed(1)}%\nActive: ${analytics.active}, Won: ${analytics.won}, Lost: ${analytics.lost}\nStale clients (30+ days no activity): ${analytics.stale}\nTop channels: ${Object.entries(analytics.byMode).map(([k, v]) => `${k}: ${v}`).join(", ")}\nCategories: ${Object.entries(analytics.byCategory).map(([k, v]) => `${k}: ${v}`).join(", ")}\nBest converting category: ${analytics.bestCategory ?? "n/a"}\nTop performers: ${analytics.topUsers.map((u) => `${u.name}: ${u.wins} wins`).join(", ") || "none yet"}`;
+      const result = await aiChatComplete({
+        data: {
+          messages: [...messages, u].filter((m) => m.role === "user" || m.role === "assistant").map((m) => ({ role: m.role, content: m.content })),
+          analyticsContext,
+        },
+      });
+      setMessages((prev) => {
+        const c = [...prev];
+        c[c.length - 1] = { ...c[c.length - 1], content: result.content };
+        return c;
+      });
+    } catch (e: any) {
+      toast.error(e.message || "AI error");
+      console.error(e);
+      // Remove the empty assistant bubble on failure
+      setMessages((prev) => prev.slice(0, -1));
     } finally { setStreaming(false); }
   }
 
   return (
     <Card>
-      <CardHeader><CardTitle>AI Console</CardTitle><CardDescription>Streamed responses, grounded in live analytics</CardDescription></CardHeader>
+      <CardHeader>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <CardTitle>AI Console</CardTitle>
+            <CardDescription>Streamed responses, grounded in live analytics</CardDescription>
+          </div>
+          {messages.length > 1 && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() =>
+                setMessages([
+                  {
+                    id: "i",
+                    role: "assistant",
+                    content:
+                      "Admin console. Ask anything about the workspace — funnel, channels, stale clients, top performers.",
+                  },
+                ])
+              }
+              className="text-muted-foreground hover:text-destructive shrink-0 cursor-pointer"
+              title="Clear chat"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      </CardHeader>
       <CardContent>
         <div ref={ref} className="h-80 overflow-y-auto space-y-3 mb-3 pr-2">
           {messages.map((m) => (
             <div key={m.id} className={`flex gap-2 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
               {m.role === "assistant" && <div className="h-7 w-7 rounded-full bg-primary/15 flex items-center justify-center"><Bot className="h-4 w-4 text-primary" /></div>}
-              <div className={`max-w-[80%] rounded px-3 py-2 text-sm whitespace-pre-wrap ${m.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>{m.content || "…"}</div>
+              <div className={`max-w-[80%] rounded px-3 py-2 text-sm whitespace-pre-wrap ${m.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                {m.content ? <Markdown content={m.content} /> : "…"}
+              </div>
               {m.role === "user" && <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center"><User className="h-4 w-4" /></div>}
             </div>
           ))}

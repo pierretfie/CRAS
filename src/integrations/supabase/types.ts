@@ -115,6 +115,9 @@ export type Database = {
         Row: {
           category: string
           contact_person: string | null
+          contact_person_email: string | null
+          contact_person_phone: string | null
+          contact_person_role: string | null
           created_at: string
           created_by: string
           current_stage: number
@@ -134,6 +137,9 @@ export type Database = {
         Insert: {
           category: string
           contact_person?: string | null
+          contact_person_email?: string | null
+          contact_person_phone?: string | null
+          contact_person_role?: string | null
           created_at?: string
           created_by: string
           current_stage?: number
@@ -153,6 +159,9 @@ export type Database = {
         Update: {
           category?: string
           contact_person?: string | null
+          contact_person_email?: string | null
+          contact_person_phone?: string | null
+          contact_person_role?: string | null
           created_at?: string
           created_by?: string
           current_stage?: number

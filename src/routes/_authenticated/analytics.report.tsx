@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { useAnalyticsData } from "@/hooks/use-analytics-data";
-import { mockChat } from "@/lib/ai-mock";
+import { Markdown } from "@/components/markdown";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Send, Download, FileDown, Bot, User } from "lucide-react";
+import { Send, Download, FileDown, Bot, User, FileText, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 
@@ -46,20 +46,26 @@ function ReportPage() {
     setStreaming(true);
 
     try {
-      const stream = mockChat(
-        [...messages, userMsg].map((m) => ({ role: m.role, content: m.content })),
-        analytics as unknown as Record<string, unknown>,
-      );
-      for await (const chunk of stream) {
-        setMessages((prev) => {
-          const copy = [...prev];
-          copy[copy.length - 1] = { ...copy[copy.length - 1], content: copy[copy.length - 1].content + chunk };
-          return copy;
-        });
-      }
-    } catch (e) {
-      toast.error("AI error");
+      const { aiChatComplete } = await import("@/lib/api/ai.functions");
+      const analyticsContext = `Total clients: ${analytics.total}\nConversion rate: ${(analytics.conversion * 100).toFixed(1)}%\nActive: ${analytics.active}, Won: ${analytics.won}, Lost: ${analytics.lost}\nStale clients (30+ days no activity): ${analytics.stale}\nTop channels: ${Object.entries(analytics.byMode).map(([k, v]) => `${k}: ${v}`).join(", ")}\nCategories: ${Object.entries(analytics.byCategory).map(([k, v]) => `${k}: ${v}`).join(", ")}\nBest converting category: ${analytics.bestCategory ?? "n/a"}\nTop performers: ${analytics.topUsers.map((u) => `${u.name}: ${u.wins} wins`).join(", ") || "none yet"}`;
+      
+      const result = await aiChatComplete({
+        data: {
+          messages: [...messages, userMsg].filter((m) => m.role === "user" || m.role === "assistant").map((m) => ({ role: m.role, content: m.content })),
+          analyticsContext,
+        },
+      });
+
+      setMessages((prev) => {
+        const copy = [...prev];
+        copy[copy.length - 1] = { ...copy[copy.length - 1], content: result.content };
+        return copy;
+      });
+    } catch (e: any) {
+      toast.error(e.message || "AI error");
       console.error(e);
+      // Remove the empty assistant bubble on failure
+      setMessages((prev) => prev.slice(0, -1));
     } finally {
       setStreaming(false);
     }
@@ -125,6 +131,79 @@ function ReportPage() {
     toast.success("Report downloaded");
   }
 
+  function downloadLatex() {
+    if (!analytics) return;
+    const esc = (s: string) =>
+      s.replace(/[&%$#_{}~^\\]/g, (c) =>
+        ({ "&": "\\&", "%": "\\%", "$": "\\$", "#": "\\#", _: "\\_", "{": "\\{", "}": "\\}", "~": "\\textasciitilde{}", "^": "\\textasciicircum{}", "\\": "\\textbackslash{}" }[c] ?? c)
+      );
+
+    const lines: string[] = [
+      "\\documentclass[12pt,a4paper]{article}",
+      "\\usepackage[utf8]{inputenc}",
+      "\\usepackage[T1]{fontenc}",
+      "\\usepackage{geometry}",
+      "\\geometry{margin=2.5cm}",
+      "\\usepackage{booktabs}",
+      "\\usepackage{xcolor}",
+      "\\definecolor{crasred}{RGB}{200,30,30}",
+      "\\usepackage{hyperref}",
+      "",
+      "\\title{\\textcolor{crasred}{CRAS Conversion Report}}",
+      `\\date{${esc(new Date().toLocaleString())}}`,
+      "\\author{CRAS Analytics System}",
+      "",
+      "\\begin{document}",
+      "\\maketitle",
+      "",
+      "\\section*{Overview}",
+      `\\textbf{Total clients:} ${analytics.total} \\\\`,
+      `\\textbf{Conversion rate:} ${(analytics.conversion * 100).toFixed(1)}\\% \\\\`,
+      `\\textbf{Active / Won / Lost:} ${analytics.active} / ${analytics.won} / ${analytics.lost} \\\\`,
+      `\\textbf{Stale clients (30+ days):} ${analytics.stale} \\\\`,
+      "",
+      "\\section*{Mode of Connection}",
+      "\\begin{itemize}",
+      ...Object.entries(analytics.byMode).map(([k, v]) => `  \\item \\textbf{${esc(k)}:} ${v}`),
+      "\\end{itemize}",
+      "",
+      "\\section*{Categories}",
+      "\\begin{itemize}",
+      ...Object.entries(analytics.byCategory).map(([k, v]) => `  \\item \\textbf{${esc(k)}:} ${v}`),
+      "\\end{itemize}",
+      "",
+      "\\section*{Top Performers}",
+      analytics.topUsers.length === 0
+        ? "No conversions yet."
+        : [
+            "\\begin{tabular}{ll}",
+            "\\toprule",
+            "Name & Wins \\\\\\\\",
+            "\\midrule",
+            ...analytics.topUsers.map((u) => `${esc(u.name)} & ${u.wins} \\\\`),
+            "\\bottomrule",
+            "\\end{tabular}",
+          ].join("\n"),
+      "",
+      "\\section*{AI Analyst Conversation}",
+      ...messages.flatMap((m) => [
+        `\\subsection*{${m.role === "user" ? "User" : "Assistant"}}`,
+        esc(m.content.replace(/\*\*/g, "")),
+        "",
+      ]),
+      "\\end{document}",
+    ];
+
+    const blob = new Blob([lines.join("\n")], { type: "text/x-tex" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `cras-report-${Date.now()}.tex`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("LaTeX file downloaded");
+  }
+
   function viewPDF() {
     if (!analytics) return;
     const doc = new jsPDF({ unit: "pt", format: "a4" });
@@ -154,7 +233,20 @@ function ReportPage() {
           <h1 className="text-2xl font-bold tracking-tight">AI Report Assistant</h1>
           <p className="text-sm text-muted-foreground">Chat with the CRAS analyst about your data</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {messages.length > 1 && (
+            <Button variant="ghost" size="sm" onClick={() => setMessages([
+              {
+                id: "intro",
+                role: "assistant",
+                content:
+                  "Hi — I'm your CRAS analyst. I can answer questions about your funnel, channels, categories, top performers, or stale clients. Say **\"give me a report\"** for a full written summary, then download it as PDF.",
+              },
+            ])} className="text-muted-foreground hover:text-destructive shrink-0 cursor-pointer">
+              <Trash2 className="h-4 w-4 mr-1" />Clear Chat
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={downloadLatex}><FileText className="h-4 w-4 mr-1" />Download .tex</Button>
           <Button variant="outline" size="sm" onClick={viewPDF}><FileDown className="h-4 w-4 mr-1" />View PDF</Button>
           <Button size="sm" onClick={downloadPDF}><Download className="h-4 w-4 mr-1" />Download PDF</Button>
         </div>
@@ -180,7 +272,11 @@ function ReportPage() {
                       : "bg-muted text-foreground"
                   }`}
                 >
-                  {m.content || (streaming ? "…" : "")}
+                  {m.content ? (
+                    <Markdown content={m.content} />
+                  ) : (
+                    streaming ? "…" : ""
+                  )}
                 </div>
                 {m.role === "user" && (
                   <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">

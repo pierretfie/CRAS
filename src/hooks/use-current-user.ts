@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { query } from "@/lib/db";
 
 export function useCurrentUser() {
   return useQuery({
@@ -7,11 +8,13 @@ export function useCurrentUser() {
     queryFn: async () => {
       const { data } = await supabase.auth.getUser();
       if (!data.user) return null;
-      const [{ data: profile }, { data: roles }] = await Promise.all([
-        supabase.from("profiles").select("*").eq("id", data.user.id).maybeSingle(),
-        supabase.from("user_roles").select("role").eq("user_id", data.user.id),
+      const [{ data: profileData }, { data: rolesData }] = await Promise.all([
+        query('SELECT * FROM profiles WHERE id = $1', [data.user.id]),
+        query('SELECT role FROM user_roles WHERE user_id = $1', [data.user.id]),
       ]);
-      const isAdmin = (roles ?? []).some((r) => r.role === "admin");
+      const profile = (profileData as any[])?.length > 0 ? (profileData as any[])[0] : null;
+      const roles = (rolesData ?? []) as { role: string }[];
+      const isAdmin = roles.some((r) => r.role === "admin");
       return { user: data.user, profile, isAdmin };
     },
   });

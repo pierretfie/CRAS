@@ -1,8 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { query } from "@/lib/db";
 import { useState } from "react";
-import { normalizeClientPayload } from "@/lib/ai-mock";
+import { normalizeClientData } from "@/lib/api/ai.functions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,11 +25,19 @@ function NewClient() {
 
   const { data: categories } = useQuery({
     queryKey: ["admin_categories"],
-    queryFn: async () => (await supabase.from("admin_categories").select("*").order("name")).data ?? [],
+    queryFn: async () => {
+      const res = await query('SELECT * FROM admin_categories ORDER BY name');
+      if (res.error) throw res.error;
+      return res.data;
+    },
   });
   const { data: stages } = useQuery({
     queryKey: ["stage_config"],
-    queryFn: async () => (await supabase.from("conversion_stage_config").select("*").order("stage_number")).data ?? [],
+    queryFn: async () => {
+      const res = await query('SELECT * FROM conversion_stage_config ORDER BY stage_number');
+      if (res.error) throw res.error;
+      return res.data;
+    },
   });
 
   const [form, setForm] = useState({
@@ -36,6 +45,9 @@ function NewClient() {
     email: "",
     location: "",
     contact_person: "",
+    contact_person_email: "",
+    contact_person_phone: "",
+    contact_person_role: "",
     category: "",
     customCategory: "",
     mode: "",
@@ -44,78 +56,112 @@ function NewClient() {
     stage_notes: "",
   });
   const [customFields, setCustomFields] = useState<{ key: string; value: string }[]>([]);
-  const [preview, setPreview] = useState<null | ReturnType<typeof normalizeClientPayload>>(null);
+  const [preview, setPreview] = useState<null | { category: string; modeOfConnection: string; stageValue: number; stageLabel?: string; reasoning: string }>(null);
+  const [normalizing, setNormalizing] = useState(false);
   const [saving, setSaving] = useState(false);
 
   function set<K extends keyof typeof form>(k: K, v: (typeof form)[K]) {
     setForm((f) => ({ ...f, [k]: v }));
   }
 
-  function runAI() {
+  async function runAI() {
     const cat = form.customCategory.trim() || form.category;
     const mode = form.customMode.trim() || form.mode;
     if (!form.name.trim()) return toast.error("Name required");
     if (!cat) return toast.error("Category required");
     if (!mode) return toast.error("Mode of connection required");
     if (!form.stage_notes.trim()) return toast.error("Describe the current stage");
-    const stageLabel = stages?.find((s) => s.stage_number === form.stage)?.label ?? "";
-    const result = normalizeClientPayload({
-      category: cat,
-      modeOfConnection: mode,
-      stage: form.stage,
-      stageDescription: form.stage_notes,
-      stageLabel,
-    });
-    setPreview(result);
+    const stageLabel = stages?.find((s: any) => s.stage_number === form.stage)?.label ?? "";
+    setNormalizing(true);
+    try {
+      const result = await normalizeClientData({
+        data: {
+          category: cat,
+          modeOfConnection: mode,
+          stage: form.stage,
+          stageDescription: form.stage_notes,
+          stageLabel,
+        },
+      });
+      setPreview(result);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message ?? "Failed to run AI normalization");
+    } finally {
+      setNormalizing(false);
+    }
   }
 
   async function save() {
     if (!preview) return;
     setSaving(true);
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) { setSaving(false); return toast.error("Not signed in"); }
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) { setSaving(false); return toast.error("Not signed in"); }
 
-    const cf: Record<string, string> = {};
-    customFields.forEach((kv) => { if (kv.key.trim()) cf[kv.key.trim()] = kv.value; });
+      const cf: Record<string, string> = {};
+      customFields.forEach((kv) => { if (kv.key.trim()) cf[kv.key.trim()] = kv.value; });
 
-    const { data: client, error } = await supabase.from("clients").insert({
-      name: form.name.trim(),
-      email: form.email.trim() || null,
-      location: form.location.trim() || null,
-      contact_person: form.contact_person.trim() || null,
-      category: preview.category,
-      mode_of_connection: preview.modeOfConnection,
-      current_stage: form.stage,
-      stage_value: preview.stageValue,
-      stage_label: preview.stageLabel ?? null,
-      stage_notes: form.stage_notes,
-      custom_fields: cf,
-      created_by: u.user.id,
-    }).select("id").single();
+      // Insert client
+      const clientRes = await query(
+        `INSERT INTO clients (name, email, location, contact_person, contact_person_email, contact_person_phone, contact_person_role, category, mode_of_connection, current_stage, stage_value, stage_label, stage_notes, custom_fields, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+         RETURNING id`,
+        [
+          form.name.trim(),
+          form.email.trim() || null,
+          form.location.trim() || null,
+          form.contact_person.trim() || null,
+          form.contact_person_email.trim() || null,
+          form.contact_person_phone.trim() || null,
+          form.contact_person_role.trim() || null,
+          preview.category,
+          preview.modeOfConnection,
+          form.stage,
+          preview.stageValue,
+          preview.stageLabel ?? null,
+          form.stage_notes,
+          cf,
+          u.user.id,
+        ]
+      );
+      if (clientRes.error) throw clientRes.error;
+      if (!clientRes.data || clientRes.data.length === 0) throw new Error("Insert returned no row");
+      const client = clientRes.data[0];
 
-    if (error || !client) {
+      // Insert client_stage_events
+      const stageEventRes = await query(
+        `INSERT INTO client_stage_events (client_id, user_id, from_stage, to_stage, event_type, description, stage_value)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          client.id,
+          u.user.id,
+          null,
+          form.stage,
+          "note",
+          form.stage_notes,
+          preview.stageValue,
+        ]
+      );
+      if (stageEventRes.error) throw stageEventRes.error;
+
+      // Insert client_interactions
+      const interactionRes = await query(
+        `INSERT INTO client_interactions (user_id, client_id, note)
+         VALUES ($1, $2, $3)`,
+        [u.user.id, client.id, "Created client"]
+      );
+      if (interactionRes.error) throw interactionRes.error;
+
+      toast.success("Client saved");
+      navigate({ to: "/clients/$id", params: { id: client.id } });
+    } catch (err: any) {
       setSaving(false);
-      console.error(error);
-      return toast.error(error?.message ?? "Failed to save");
+      console.error(err);
+      toast.error(err.message ?? "Failed to save");
+    } finally {
+      setSaving(false);
     }
-
-    await supabase.from("client_stage_events").insert({
-      client_id: client.id,
-      user_id: u.user.id,
-      from_stage: null,
-      to_stage: form.stage,
-      event_type: "note",
-      description: form.stage_notes,
-      stage_value: preview.stageValue,
-    });
-    await supabase.from("client_interactions").insert({
-      user_id: u.user.id,
-      client_id: client.id,
-      note: "Created client",
-    });
-
-    toast.success("Client saved");
-    navigate({ to: "/clients/$id", params: { id: client.id } });
   }
 
   return (
@@ -131,7 +177,10 @@ function NewClient() {
           <Field label="Client Name *"><Input value={form.name} onChange={(e) => set("name", e.target.value)} /></Field>
           <Field label="Email"><Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} /></Field>
           <Field label="Location"><Input value={form.location} onChange={(e) => set("location", e.target.value)} /></Field>
-          <Field label="Contact Person"><Input value={form.contact_person} onChange={(e) => set("contact_person", e.target.value)} /></Field>
+          <Field label="Contact Person"><Input value={form.contact_person} onChange={(e) => set("contact_person", e.target.value)} placeholder="Name" /></Field>
+          <Field label="Contact Person Email"><Input type="email" value={form.contact_person_email} onChange={(e) => set("contact_person_email", e.target.value)} placeholder="Optional" /></Field>
+          <Field label="Contact Person Phone"><Input type="tel" value={form.contact_person_phone} onChange={(e) => set("contact_person_phone", e.target.value)} placeholder="Optional" /></Field>
+          <Field label="Contact Person Role"><Input value={form.contact_person_role} onChange={(e) => set("contact_person_role", e.target.value)} placeholder="e.g. CEO, Manager" /></Field>
         </CardContent>
       </Card>
 
@@ -142,7 +191,7 @@ function NewClient() {
             <Select value={form.category} onValueChange={(v) => set("category", v)}>
               <SelectTrigger><SelectValue placeholder="Pick or type custom" /></SelectTrigger>
               <SelectContent>
-                {categories?.map((c) => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
+                {categories?.map((c: any) => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>
             <Input className="mt-2" placeholder="Or type custom" value={form.customCategory} onChange={(e) => set("customCategory", e.target.value)} />
@@ -162,7 +211,7 @@ function NewClient() {
             <Select value={String(form.stage)} onValueChange={(v) => set("stage", Number(v))}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {stages?.map((s) => <SelectItem key={s.id} value={String(s.stage_number)}>{s.stage_number}. {s.label}</SelectItem>)}
+                {stages?.map((s: any) => <SelectItem key={s.id} value={String(s.stage_number)}>{s.stage_number}. {s.label}</SelectItem>)}
               </SelectContent>
             </Select>
           </Field>
@@ -196,7 +245,9 @@ function NewClient() {
 
       {!preview ? (
         <div className="flex justify-end">
-          <Button onClick={runAI}><Sparkles className="h-4 w-4 mr-2" />Normalize with AI</Button>
+          <Button onClick={runAI} disabled={normalizing}>
+            {normalizing ? "Normalizing..." : <><Sparkles className="h-4 w-4 mr-2" />Normalize with AI</>}
+          </Button>
         </div>
       ) : (
         <Card className="border-primary/50">

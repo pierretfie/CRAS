@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { query } from "@/lib/db";
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, Edit, TrendingUp, XCircle, Trophy } from "lucide-react";
 import { toast } from "sonner";
-import { classifyStageValue } from "@/lib/ai-mock";
+import { classifyStageValue } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/clients/$id")({
   component: ClientDetail,
@@ -27,11 +28,19 @@ function ClientDetail() {
 
   const { data: client, refetch } = useQuery({
     queryKey: ["client", id],
-    queryFn: async () => (await supabase.from("clients").select("*").eq("id", id).maybeSingle()).data,
+    queryFn: async () => {
+      const res = await query('SELECT * FROM clients WHERE id = $1', [id]);
+      if (res.error) throw res.error;
+      return res.data && res.data.length > 0 ? res.data[0] : null;
+    },
   });
   const { data: events } = useQuery({
     queryKey: ["events", id],
-    queryFn: async () => (await supabase.from("client_stage_events").select("*").eq("client_id", id).order("created_at", { ascending: false })).data ?? [],
+    queryFn: async () => {
+      const res = await query('SELECT * FROM client_stage_events WHERE client_id = $1 ORDER BY created_at DESC', [id]);
+      if (res.error) throw res.error;
+      return res.data;
+    },
   });
 
   if (!client) return <div className="text-muted-foreground">Loading…</div>;
@@ -46,7 +55,12 @@ function ClientDetail() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{client.name}</h1>
           <div className="flex items-center gap-2 mt-2">
-            <Badge variant="outline">Stage {client.current_stage}{client.stage_label ? ` · ${client.stage_label}` : ""}</Badge>
+            <Badge variant="outline" className={
+              client.current_stage === 1 ? "border-stage-1/30 text-stage-1 bg-stage-1/10" :
+              client.current_stage === 2 ? "border-stage-2/30 text-stage-2 bg-stage-2/10" :
+              client.current_stage === 3 ? "border-stage-3/30 text-stage-3 bg-stage-3/10" :
+              ""
+            }>Stage {client.current_stage}{client.stage_label ? ` · ${client.stage_label}` : ""}</Badge>
             <Badge variant={client.status === "won" ? "default" : client.status === "lost" ? "destructive" : "secondary"}>{client.status}</Badge>
             <Badge variant="outline">{client.category}</Badge>
             <Badge variant="outline">{client.mode_of_connection}</Badge>
@@ -66,6 +80,9 @@ function ClientDetail() {
           <Detail k="Email" v={client.email} />
           <Detail k="Location" v={client.location} />
           <Detail k="Contact Person" v={client.contact_person} />
+          <Detail k="Contact Email" v={client.contact_person_email} />
+          <Detail k="Contact Phone" v={client.contact_person_phone} />
+          <Detail k="Contact Role" v={client.contact_person_role} />
           <Detail k="Stage Value" v={String(client.stage_value)} />
           {client.lost_reason && <Detail k="Lost Reason" v={client.lost_reason} />}
           <Detail k="Created" v={new Date(client.created_at).toLocaleDateString()} />
@@ -89,8 +106,14 @@ function ClientDetail() {
         <CardContent>
           {events && events.length > 0 ? (
             <ul className="space-y-3">
-              {events.map((e) => (
-                <li key={e.id} className="border-l-2 border-primary/50 pl-3 pb-2">
+              {events.map((e: any) => {
+                const stageNum = e.to_stage ?? e.from_stage;
+                const borderCls = stageNum === 1 ? "border-stage-1/50" :
+                                  stageNum === 2 ? "border-stage-2/50" :
+                                  stageNum === 3 ? "border-stage-3/50" :
+                                  "border-primary/50";
+                return (
+                  <li key={e.id} className={`border-l-2 ${borderCls} pl-3 pb-2`}>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Badge variant="outline" className="text-xs">{e.event_type}</Badge>
                     {e.from_stage !== null && e.to_stage !== null && (
@@ -100,8 +123,9 @@ function ClientDetail() {
                   </div>
                   <p className="text-sm mt-1">{e.description}</p>
                   {e.lost_reason && <p className="text-xs text-primary mt-1">Reason: {e.lost_reason}</p>}
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           ) : (
             <p className="text-sm text-muted-foreground">No events yet.</p>
@@ -121,29 +145,36 @@ function Detail({ k, v }: { k: string; v: string | null | undefined }) {
   );
 }
 
-function EditClientDialog({ client, onSaved }: { client: { id: string; name: string; email: string | null; location: string | null; contact_person: string | null }; onSaved: () => void }) {
+function EditClientDialog({ client, onSaved }: { client: { id: string; name: string; email: string | null; location: string | null; contact_person: string | null; contact_person_email: string | null; contact_person_phone: string | null; contact_person_role: string | null }; onSaved: () => void }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     name: client.name,
     email: client.email ?? "",
     location: client.location ?? "",
     contact_person: client.contact_person ?? "",
+    contact_person_email: client.contact_person_email ?? "",
+    contact_person_phone: client.contact_person_phone ?? "",
+    contact_person_role: client.contact_person_role ?? "",
   });
   const [saving, setSaving] = useState(false);
 
   async function save() {
     setSaving(true);
-    const { error } = await supabase.from("clients").update({
-      name: form.name,
-      email: form.email || null,
-      location: form.location || null,
-      contact_person: form.contact_person || null,
-    }).eq("id", client.id);
-    setSaving(false);
-    if (error) return toast.error(error.message);
-    toast.success("Saved");
-    setOpen(false);
-    onSaved();
+    try {
+      const res = await query(
+        `UPDATE clients SET name = $1, email = $2, location = $3, contact_person = $4, contact_person_email = $5, contact_person_phone = $6, contact_person_role = $7 WHERE id = $8`,
+        [form.name, form.email || null, form.location || null, form.contact_person || null, form.contact_person_email || null, form.contact_person_phone || null, form.contact_person_role || null, client.id]
+      );
+      if (res.error) throw res.error;
+      toast.success("Saved");
+      setOpen(false);
+      onSaved();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message ?? "Failed to save");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -155,7 +186,15 @@ function EditClientDialog({ client, onSaved }: { client: { id: string; name: str
           <div className="space-y-1"><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
           <div className="space-y-1"><Label>Email</Label><Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
           <div className="space-y-1"><Label>Location</Label><Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} /></div>
-          <div className="space-y-1"><Label>Contact Person</Label><Input value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} /></div>
+          <div className="border-t pt-3">
+            <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Contact Person (optional)</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1 col-span-2"><Label>Name</Label><Input placeholder="Contact name" value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} /></div>
+              <div className="space-y-1"><Label>Email</Label><Input type="email" placeholder="Optional" value={form.contact_person_email} onChange={(e) => setForm({ ...form, contact_person_email: e.target.value })} /></div>
+              <div className="space-y-1"><Label>Phone</Label><Input type="tel" placeholder="Optional" value={form.contact_person_phone} onChange={(e) => setForm({ ...form, contact_person_phone: e.target.value })} /></div>
+              <div className="space-y-1 col-span-2"><Label>Role / Title</Label><Input placeholder="e.g. CEO, Manager" value={form.contact_person_role} onChange={(e) => setForm({ ...form, contact_person_role: e.target.value })} /></div>
+            </div>
+          </div>
         </div>
         <DialogFooter><Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button></DialogFooter>
       </DialogContent>
@@ -188,21 +227,35 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
     else if (mode === "lost") { update.status = "lost"; update.lost_reason = reason; }
     else { update.current_stage = toStage; update.stage_value = stageVal; update.stage_notes = description; }
 
-    const { error: uErr } = await supabase.from("clients").update(update).eq("id", client.id);
-    if (uErr) { setSaving(false); return toast.error(uErr.message); }
+    // Update clients table
+    const status = update.status ?? null;
+    const current_stage = update.current_stage ?? null;
+    const stage_value = update.stage_value ?? null;
+    const lost_reason = update.lost_reason ?? null;
+    const stage_notes = update.stage_notes ?? null;
+    const clientRes = await query(
+      `UPDATE clients SET status = $1, current_stage = $2, stage_value = $3, lost_reason = $4, stage_notes = $5 WHERE id = $6`,
+      [status, current_stage, stage_value, lost_reason, stage_notes, client.id]
+    );
+    if (clientRes.error) {
+      setSaving(false);
+      return toast.error(clientRes.error.message);
+    }
 
-    const { error: eErr } = await supabase.from("client_stage_events").insert({
-      client_id: client.id,
-      user_id: u.user.id,
-      from_stage: client.current_stage,
-      to_stage: mode === "won" ? 3 : mode === "lost" ? null : toStage,
-      event_type: eventType,
-      description,
-      lost_reason: mode === "lost" ? reason : null,
-      stage_value: mode === "won" ? 1 : mode === "lost" ? 0 : stageVal,
-    });
+    // Insert into client_stage_events
+    const toStageVal = mode === "won" ? 3 : mode === "lost" ? null : toStage;
+    const stageValInsert = mode === "won" ? 1 : mode === "lost" ? 0 : stageVal;
+    const lostReasonInsert = mode === "lost" ? reason : null;
+    const eventRes = await query(
+      `INSERT INTO client_stage_events (client_id, user_id, from_stage, to_stage, event_type, description, lost_reason, stage_value)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [client.id, u.user.id, client.current_stage, toStageVal, eventType, description, lostReasonInsert, stageValInsert]
+    );
+    if (eventRes.error) {
+      setSaving(false);
+      return toast.error(eventRes.error.message);
+    }
     setSaving(false);
-    if (eErr) return toast.error(eErr.message);
     toast.success("Stage updated");
     setOpen(false);
     setDescription("");

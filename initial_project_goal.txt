@@ -1,0 +1,29 @@
+i have a project please help improve my prompt for ai to understand the project structure and needs:
+prompt starts here:
+you are a moder software developer; build a web interface Conversion Rate Analytics System(CRAS) for companies where companiy admins can use this system to monitor how their users are obtaining and onboarding clients  the app details: users can load these details 1. we have client details, Name optionals: email. location, contact person  2. Category of service the client wants/clent category (custom) user feeds it in but admin can set categories eg Developer, Fuel etc 3. mode of connection how did the client find us (custom input) with starter modes eg Social media, company website, referalls, direct approach etc  4. conversion level(use red, orange conversion level can be broken into 3 stages stage1 (custom fill) equiry stage or the stage where user has formed a basic connection with client  stage 2 (custom fill) there have been some development, meetings etc  stage 3 (custom fill) client has been onboarded, product sold etc  this system runs with an nvidia AI that based on user description on custom fields; it can assign each client a stage with a value 0 or 1 so that when analytics is done it can be easier to tell which level the client is  so when user is done filling in the details or form, the ai now presensts a preview of what to save then user saves, even the custom inputs should be saved  here is a snippet of how nvidia 120b model is used: import OpenAI from "openai";
+// Initialize the client with the NVIDIA API endpoint
+const client = new OpenAI({
+  baseURL: "https://integrate.api.nvidia.com/v1",
+  apiKey: process.env.NVIDIA_API_KEY ?? "nvapi-........................................",
+});
+// Request completion with reasoning correctly configured in extra_body
+const completion = await client.chat.completions.create({
+  model: "nvidia/nemotron-3-super-120b-a12b",
+  messages: [{ role: "user", content: "How many r's are in strawberry?" }],
+  temperature: 0.7,
+  // Pass all custom model configurations here:
+  extra_body: {
+    chat_template_kwargs: { enable_thinking: true },
+    reasoning_budget: 1024,
+  },
+  stream: true,
+});
+// Process streamed output (reasoning + final answer)
+for await (const chunk of completion) {
+  if (chunk.choices?.length) {
+    const delta = chunk.choices[0].delta;
+    // Print reasoning and final content from stream delta
+    process.stdout.write(delta.reasoning_content ?? "");
+    process.stdout.write(delta.content ?? "");
+  }
+}  but key will be stored in .env  the systems key important page and dashboard and use is analytics companies can see 1. mode anlysis  so here AI should save uniform data eg is user typed in social media it must be specific - facebook ig so that AI saves Facebook, this will prevent errors when analysis data so that we dont have FB, Facebook, FACEBOOK for different clients, uniform data will make anaysis and companies can see which mode is bringing in more clients 2. data analysis conversion rate, best selling product, etc all data being fed in here is important Ai can generate reports(in latex ansd outputs latex and pdf) too, charts etc users and admins have access to all except the admin page   Numbers and visuals are key for this system so analytics and data saving is key   we have an extra admin page for admins where AI can be queried eg "How is the company doing" so AI can access data data will be saved in a postgres db accessed through a url users should be linked to the clients they have interacted with all this data is present  users creation for now let admin be able to create a user , emails, department, name etc generate random password  user can sisgn in  with email and password and if 1st time change their provided password by admin

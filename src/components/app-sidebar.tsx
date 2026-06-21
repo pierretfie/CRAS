@@ -13,18 +13,21 @@ import {
 } from "@/components/ui/sidebar";
 import { useCurrentUser } from "@/hooks/use-current-user";
 
-const baseItems = [
-  { title: "Analytics", url: "/analytics", icon: BarChart3 },
-  { title: "AI Report", url: "/analytics/report", icon: MessageSquareText },
-  { title: "Clients", url: "/clients", icon: Users },
-  { title: "New Client", url: "/clients/new", icon: PlusCircle },
-];
+import { useAIDrawer } from "@/hooks/use-ai-drawer";
 
 export function AppSidebar() {
   const { data } = useCurrentUser();
+  const { toggle } = useAIDrawer();
   const path = useRouterState({ select: (r) => r.location.pathname });
   const isActive = (url: string) =>
     url === "/clients" ? path === "/clients" || path.startsWith("/clients/") && path !== "/clients/new" : path === url;
+
+  const baseItems = [
+    { title: "Analytics", url: "/analytics", icon: BarChart3 },
+    { title: "AI Assistant", icon: MessageSquareText, onClick: toggle },
+    { title: "Clients", url: "/clients", icon: Users },
+    { title: "New Client", url: "/clients/new", icon: PlusCircle },
+  ];
 
   return (
     <Sidebar collapsible="icon">
@@ -39,14 +42,21 @@ export function AppSidebar() {
           <SidebarGroupLabel>Workspace</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {baseItems.map((item) => (
-                <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                    <Link to={item.url}>
+              {baseItems.map((item, idx) => (
+                <SidebarMenuItem key={item.title}>
+                  {item.onClick ? (
+                    <SidebarMenuButton onClick={item.onClick} className="cursor-pointer">
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
+                    </SidebarMenuButton>
+                  ) : (
+                    <SidebarMenuButton asChild isActive={isActive(item.url || "")}>
+                      <Link to={item.url || ""}>
+                        <item.icon className="h-4 w-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  )}
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
