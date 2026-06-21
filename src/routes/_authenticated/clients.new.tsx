@@ -31,6 +31,10 @@ function NewClient() {
       return res.data;
     },
   });
+  const { data: products } = useQuery({
+    queryKey: ["admin_products"],
+    queryFn: async () => (await supabase.from("admin_products").select("*").order("name")).data ?? [],
+  });
   const { data: stages } = useQuery({
     queryKey: ["stage_config"],
     queryFn: async () => {
@@ -52,6 +56,8 @@ function NewClient() {
     customCategory: "",
     mode: "",
     customMode: "",
+    product: "",
+    customProduct: "",
     stage: 1,
     stage_notes: "",
   });
@@ -102,64 +108,22 @@ function NewClient() {
       const cf: Record<string, string> = {};
       customFields.forEach((kv) => { if (kv.key.trim()) cf[kv.key.trim()] = kv.value; });
 
-      // Insert client
-      const clientRes = await query(
-        `INSERT INTO clients (name, email, location, contact_person, contact_person_email, contact_person_phone, contact_person_role, category, mode_of_connection, current_stage, stage_value, stage_label, stage_notes, custom_fields, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-         RETURNING id`,
-        [
-          form.name.trim(),
-          form.email.trim() || null,
-          form.location.trim() || null,
-          form.contact_person.trim() || null,
-          form.contact_person_email.trim() || null,
-          form.contact_person_phone.trim() || null,
-          form.contact_person_role.trim() || null,
-          preview.category,
-          preview.modeOfConnection,
-          form.stage,
-          preview.stageValue,
-          preview.stageLabel ?? null,
-          form.stage_notes,
-          cf,
-          u.user.id,
-        ]
-      );
-      if (clientRes.error) throw clientRes.error;
-      if (!clientRes.data || clientRes.data.length === 0) throw new Error("Insert returned no row");
-      const client = clientRes.data[0];
+    const { data: client, error } = await supabase.from("clients").insert({
+      name: form.name.trim(),
+      email: form.email.trim() || null,
+      location: form.location.trim() || null,
+      contact_person: form.contact_person.trim() || null,
+      category: preview.category,
+      mode_of_connection: preview.modeOfConnection,
+      current_stage: form.stage,
+      stage_value: preview.stageValue,
+      stage_label: preview.stageLabel ?? null,
+      stage_notes: form.stage_notes,
+      custom_fields: cf,
+      created_by: u.user.id,
+    }).select("id").single();
 
-      // Insert client_stage_events
-      const stageEventRes = await query(
-        `INSERT INTO client_stage_events (client_id, user_id, from_stage, to_stage, event_type, description, stage_value)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [
-          client.id,
-          u.user.id,
-          null,
-          form.stage,
-          "note",
-          form.stage_notes,
-          preview.stageValue,
-        ]
-      );
-      if (stageEventRes.error) throw stageEventRes.error;
-
-      // Insert client_interactions
-      const interactionRes = await query(
-        `INSERT INTO client_interactions (user_id, client_id, note)
-         VALUES ($1, $2, $3)`,
-        [u.user.id, client.id, "Created client"]
-      );
-      if (interactionRes.error) throw interactionRes.error;
-
-      toast.success("Client saved");
-      navigate({ to: "/clients/$id", params: { id: client.id } });
-    } catch (err: any) {
-      setSaving(false);
-      console.error(err);
-      toast.error(err.message ?? "Failed to save");
-    } finally {
+    if (error || !client) {
       setSaving(false);
     }
   }
@@ -187,6 +151,16 @@ function NewClient() {
       <Card>
         <CardHeader><CardTitle>Classification</CardTitle><CardDescription>Pick from presets or add your own</CardDescription></CardHeader>
         <CardContent className="grid md:grid-cols-2 gap-4">
+          <Field label="Product">
+            <Select value={form.product} onValueChange={(v) => set("product", v)}>
+              <SelectTrigger><SelectValue placeholder="Pick or type custom" /></SelectTrigger>
+              <SelectContent>
+                {products?.map((p) => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Input className="mt-2" placeholder="Or type custom" value={form.customProduct} onChange={(e) => set("customProduct", e.target.value)} />
+          </Field>
+
           <Field label="Category">
             <Select value={form.category} onValueChange={(v) => set("category", v)}>
               <SelectTrigger><SelectValue placeholder="Pick or type custom" /></SelectTrigger>

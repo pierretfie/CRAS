@@ -83,6 +83,22 @@ export function computeAnalytics(
 
   const bestCategory = Object.entries(wonByCategory).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 
+  // Product aggregations. null → "Unspecified" so existing rows are visible
+  // in the dashboards rather than silently dropped. "Enquired" mirrors the
+  // existing funnel definition (status='active') to keep semantics aligned.
+  const UNSPECIFIED = "Unspecified";
+  const bucketProduct = (v: string | null) =>
+    v && v.trim() ? v : UNSPECIFIED;
+  const byProduct: Record<string, number> = {};
+  const wonByProduct: Record<string, number> = {};
+  const enquiredByProduct: Record<string, number> = {};
+  for (const c of clients) {
+    const key = bucketProduct(c.product);
+    byProduct[key] = (byProduct[key] ?? 0) + 1;
+    if (c.status === "won") wonByProduct[key] = (wonByProduct[key] ?? 0) + 1;
+    if (c.status === "active") enquiredByProduct[key] = (enquiredByProduct[key] ?? 0) + 1;
+  }
+
   return {
     total,
     active,
@@ -99,6 +115,9 @@ export function computeAnalytics(
     staleClients,
     stale: staleClients.length,
     bestCategory,
+    byProduct,
+    wonByProduct,
+    enquiredByProduct,
   };
 }
 

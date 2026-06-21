@@ -44,14 +44,16 @@ function AdminPage() {
         <p className="text-sm text-muted-foreground">Manage workspace configuration</p>
       </div>
       <Tabs defaultValue="users">
-        <TabsList className="grid grid-cols-4 max-w-xl">
+        <TabsList className="grid grid-cols-5 max-w-xl">
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="categories">Categories</TabsTrigger>
+          <TabsTrigger value="products">Products</TabsTrigger>
           <TabsTrigger value="stages">Stages</TabsTrigger>
           <TabsTrigger value="console">AI Console</TabsTrigger>
         </TabsList>
         <TabsContent value="users"><UsersTab /></TabsContent>
         <TabsContent value="categories"><CategoriesTab /></TabsContent>
+        <TabsContent value="products"><ProductsTab /></TabsContent>
         <TabsContent value="stages"><StagesTab /></TabsContent>
         <TabsContent value="console"><ConsoleTab /></TabsContent>
       </Tabs>
@@ -285,6 +287,53 @@ function CategoriesTab() {
               <Button size="icon" variant="ghost" onClick={() => del(c.id)}><Trash2 className="h-4 w-4" /></Button>
             </div>
           ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ProductsTab() {
+  const qc = useQueryClient();
+  const { data: products } = useQuery({
+    queryKey: ["admin_products"],
+    queryFn: async () => (await supabase.from("admin_products").select("*").order("name")).data ?? [],
+  });
+  const [name, setName] = useState("");
+
+  async function add() {
+    if (!name.trim()) return;
+    const { error } = await supabase.from("admin_products").insert({ name: name.trim() });
+    if (error) toast.error(error.message);
+    else { setName(""); qc.invalidateQueries({ queryKey: ["admin_products"] }); }
+  }
+  async function del(id: string) {
+    const { error } = await supabase.from("admin_products").delete().eq("id", id);
+    if (error) toast.error(error.message);
+    else qc.invalidateQueries({ queryKey: ["admin_products"] });
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Client Products</CardTitle>
+        <CardDescription>Curated list — selectable when creating or editing a client</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex gap-2">
+          <Input placeholder="New product" value={name} onChange={(e) => setName(e.target.value)} />
+          <Button onClick={add}><Plus className="h-4 w-4 mr-1" />Add</Button>
+        </div>
+        <div className="space-y-1">
+          {products?.map((p: { id: string; name: string }) => (
+            <div key={p.id} className="flex items-center justify-between border-b border-border pb-1">
+              <span>{p.name}</span>
+              <Button size="icon" variant="ghost" onClick={() => del(p.id)}><Trash2 className="h-4 w-4" /></Button>
+            </div>
+          ))}
+          {products && products.length === 0 && (
+            <p className="text-sm text-muted-foreground">No products yet — add one above</p>
+          )}
         </div>
       </CardContent>
     </Card>

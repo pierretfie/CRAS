@@ -22,34 +22,15 @@ import {
   LabelList,
 } from "recharts";
 import { TrendingUp, Users, Trophy, AlertTriangle, MessageSquareText } from "lucide-react";
+import type { ChartConfig } from "@/components/ui/chart";
 
 export const Route = createFileRoute("/_authenticated/analytics")({
   component: AnalyticsPage,
 });
 
-// Stage colors are the dashboard's core visual language: every client sits
-// somewhere on a red (inquiry) -> amber (in progress) -> green (won) axis.
-// Reuses the same stage-1/2/3 tokens already defined in the theme (see the
-// stale-clients badges below). Classes are written as full literal strings,
-// not built dynamically, so Tailwind's content scanner can find them.
-const STAGE_STYLES = [
-  { text: "text-stage-1", bg: "bg-stage-1/10", border: "border-stage-1/40" },
-  { text: "text-stage-2", bg: "bg-stage-2/10", border: "border-stage-2/40" },
-  { text: "text-stage-3", bg: "bg-stage-3/10", border: "border-stage-3/40" },
-] as const;
-const NEUTRAL = "oklch(0.55 0.16 255)"; // single accent for non-stage data (channels, categories)
-
-const channelChartConfig: ChartConfig = {
-  value: { label: "Clients", color: NEUTRAL },
-};
-
-const categoryChartConfig: ChartConfig = {
-  value: { label: "Clients", color: NEUTRAL },
-};
-
-const timeseriesChartConfig: ChartConfig = {
-  count: { label: "Clients added", color: NEUTRAL },
-};
+const RED = "oklch(0.62 0.23 25)";
+const RED_MUTED = "oklch(0.45 0.15 25)";
+const WHITE = "oklch(0.95 0 0)";
 
 function AnalyticsPage() {
   const { data, isLoading } = useAnalyticsData();
@@ -81,6 +62,19 @@ function AnalyticsPage() {
     const advanceRate = prev && prev > 0 ? Math.round((stage.count / prev) * 100) : null;
     return { ...stage, advanceRate };
   });
+
+  const productTotal = Object.values(data.byProduct).reduce((a: number, b: number) => a + b, 0) || 1;
+  const productData = Object.entries(data.byProduct)
+    .map(([name, value]) => ({ name, value: value as number, pct: Math.round(((value as number) / productTotal) * 100) }))
+    .sort((a, b) => b.value - a.value);
+
+  const wonByProductData = Object.entries(data.wonByProduct)
+    .map(([name, value]) => ({ name, value: value as number, pct: Math.round(((value as number) / productTotal) * 100) }))
+    .sort((a, b) => b.value - a.value);
+
+  const enquiredByProductData = Object.entries(data.enquiredByProduct)
+    .map(([name, value]) => ({ name, value: value as number, pct: Math.round(((value as number) / productTotal) * 100) }))
+    .sort((a, b) => b.value - a.value);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -146,6 +140,51 @@ function AnalyticsPage() {
                 />
               </LineChart>
             </ChartContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Products</CardTitle><CardDescription>All clients per product</CardDescription></CardHeader>
+          <CardContent style={{ height: 280 }}>
+            <ResponsiveContainer>
+              <BarChart data={productData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.30 0.01 260)" />
+                <XAxis type="number" stroke={WHITE} allowDecimals={false} />
+                <YAxis type="category" dataKey="name" stroke={WHITE} width={100} />
+                <Tooltip contentStyle={{ background: "oklch(0.20 0.012 260)", border: "1px solid oklch(0.28 0.01 260)" }} />
+                <Bar dataKey="value" fill={RED} radius={[0, 6, 6, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Sold by Product</CardTitle><CardDescription>Won clients per product</CardDescription></CardHeader>
+          <CardContent style={{ height: 280 }}>
+            <ResponsiveContainer>
+              <BarChart data={wonByProductData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.30 0.01 260)" />
+                <XAxis type="number" stroke={WHITE} allowDecimals={false} />
+                <YAxis type="category" dataKey="name" stroke={WHITE} width={100} />
+                <Tooltip contentStyle={{ background: "oklch(0.20 0.012 260)", border: "1px solid oklch(0.28 0.01 260)" }} />
+                <Bar dataKey="value" fill={RED} radius={[0, 6, 6, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Enquired by Product</CardTitle><CardDescription>Active clients per product</CardDescription></CardHeader>
+          <CardContent style={{ height: 280 }}>
+            <ResponsiveContainer>
+              <BarChart data={enquiredByProductData} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.30 0.01 260)" />
+                <XAxis type="number" stroke={WHITE} allowDecimals={false} />
+                <YAxis type="category" dataKey="name" stroke={WHITE} width={100} />
+                <Tooltip contentStyle={{ background: "oklch(0.20 0.012 260)", border: "1px solid oklch(0.28 0.01 260)" }} />
+                <Bar dataKey="value" fill={RED} radius={[0, 6, 6, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>

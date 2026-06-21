@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { query } from "@/lib/db";
@@ -23,7 +23,6 @@ const LOST_REASONS = ["Price", "Timing", "Competitor", "Unresponsive", "Out of s
 
 function ClientDetail() {
   const { id } = Route.useParams();
-  const navigate = useNavigate();
   const qc = useQueryClient();
 
   const { data: client, refetch } = useQuery({
@@ -63,6 +62,7 @@ function ClientDetail() {
             }>Stage {client.current_stage}{client.stage_label ? ` · ${client.stage_label}` : ""}</Badge>
             <Badge variant={client.status === "won" ? "default" : client.status === "lost" ? "destructive" : "secondary"}>{client.status}</Badge>
             <Badge variant="outline">{client.category}</Badge>
+            {client.product && <Badge variant="outline">{client.product}</Badge>}
             <Badge variant="outline">{client.mode_of_connection}</Badge>
           </div>
         </div>
@@ -80,9 +80,6 @@ function ClientDetail() {
           <Detail k="Email" v={client.email} />
           <Detail k="Location" v={client.location} />
           <Detail k="Contact Person" v={client.contact_person} />
-          <Detail k="Contact Email" v={client.contact_person_email} />
-          <Detail k="Contact Phone" v={client.contact_person_phone} />
-          <Detail k="Contact Role" v={client.contact_person_role} />
           <Detail k="Stage Value" v={String(client.stage_value)} />
           {client.lost_reason && <Detail k="Lost Reason" v={client.lost_reason} />}
           <Detail k="Created" v={new Date(client.created_at).toLocaleDateString()} />
@@ -128,7 +125,7 @@ function ClientDetail() {
               })}
             </ul>
           ) : (
-            <p className="text-sm text-muted-foreground">No events yet.</p>
+            <p className="text-sm text-muted-foreground">No events yet</p>
           )}
         </CardContent>
       </Card>
@@ -145,58 +142,51 @@ function Detail({ k, v }: { k: string; v: string | null | undefined }) {
   );
 }
 
-function EditClientDialog({ client, onSaved }: { client: { id: string; name: string; email: string | null; location: string | null; contact_person: string | null; contact_person_email: string | null; contact_person_phone: string | null; contact_person_role: string | null }; onSaved: () => void }) {
+function EditClientDialog({ client, onSaved }: { client: { id: string; name: string; email: string | null; location: string | null; contact_person: string | null }; onSaved: () => void }) {
   const [open, setOpen] = useState(false);
+  const { data: products } = useQuery({
+    queryKey: ["admin_products"],
+    queryFn: async () => (await supabase.from("admin_products").select("*").order("name")).data ?? [],
+  });
   const [form, setForm] = useState({
     name: client.name,
     email: client.email ?? "",
     location: client.location ?? "",
     contact_person: client.contact_person ?? "",
-    contact_person_email: client.contact_person_email ?? "",
-    contact_person_phone: client.contact_person_phone ?? "",
-    contact_person_role: client.contact_person_role ?? "",
   });
   const [saving, setSaving] = useState(false);
 
   async function save() {
     setSaving(true);
-    try {
-      const res = await query(
-        `UPDATE clients SET name = $1, email = $2, location = $3, contact_person = $4, contact_person_email = $5, contact_person_phone = $6, contact_person_role = $7 WHERE id = $8`,
-        [form.name, form.email || null, form.location || null, form.contact_person || null, form.contact_person_email || null, form.contact_person_phone || null, form.contact_person_role || null, client.id]
-      );
-      if (res.error) throw res.error;
-      toast.success("Saved");
-      setOpen(false);
-      onSaved();
-    } catch (err: any) {
-      console.error(err);
-      toast.error(err.message ?? "Failed to save");
-    } finally {
-      setSaving(false);
-    }
+    const { error } = await supabase.from("clients").update({
+      name: form.name,
+      email: form.email || null,
+      location: form.location || null,
+      contact_person: form.contact_person || null,
+    }).eq("id", client.id);
+    setSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success("Saved");
+    setOpen(false);
+    onSaved();
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button variant="outline" size="sm"><Edit className="h-4 w-4 mr-1" />Edit</Button></DialogTrigger>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm"><Edit className="h-4 w-4 mr-1" />Edit</Button>
+      </DialogTrigger>
       <DialogContent>
         <DialogHeader><DialogTitle>Edit Client Details</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1"><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
           <div className="space-y-1"><Label>Email</Label><Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
           <div className="space-y-1"><Label>Location</Label><Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} /></div>
-          <div className="border-t pt-3">
-            <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Contact Person (optional)</p>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1 col-span-2"><Label>Name</Label><Input placeholder="Contact name" value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} /></div>
-              <div className="space-y-1"><Label>Email</Label><Input type="email" placeholder="Optional" value={form.contact_person_email} onChange={(e) => setForm({ ...form, contact_person_email: e.target.value })} /></div>
-              <div className="space-y-1"><Label>Phone</Label><Input type="tel" placeholder="Optional" value={form.contact_person_phone} onChange={(e) => setForm({ ...form, contact_person_phone: e.target.value })} /></div>
-              <div className="space-y-1 col-span-2"><Label>Role / Title</Label><Input placeholder="e.g. CEO, Manager" value={form.contact_person_role} onChange={(e) => setForm({ ...form, contact_person_role: e.target.value })} /></div>
-            </div>
-          </div>
+          <div className="space-y-1"><Label>Contact Person</Label><Input value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} /></div>
         </div>
-        <DialogFooter><Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button></DialogFooter>
+        <DialogFooter>
+          <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -264,11 +254,13 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild><Button size="sm"><TrendingUp className="h-4 w-4 mr-1" />Update Stage</Button></DialogTrigger>
+      <DialogTrigger asChild>
+        <Button size="sm"><TrendingUp className="h-4 w-4 mr-1" />Update Stage</Button>
+      </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Update Stage</DialogTitle>
-          <DialogDescription>Describe what happened. Mark Won when onboarded, Lost when negotiations break down.</DialogDescription>
+          <DialogDescription>Describe what happened. Mark Won when onboarded, Lost when negotiations break down</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
@@ -306,7 +298,7 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
           )}
 
           <div className="space-y-1">
-            <Label>What happened?</Label>
+            <Label>What happened</Label>
             <Textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe the update…" />
           </div>
         </div>
