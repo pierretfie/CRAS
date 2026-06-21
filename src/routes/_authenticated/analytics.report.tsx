@@ -109,6 +109,12 @@ function ReportPage() {
     for (const [k, v] of Object.entries(analytics.byCategory)) writeLine(`  - ${k}: ${v}`);
     y += 6;
 
+    writeLine("Products", { size: 14, bold: true });
+    for (const [k, v] of Object.entries(analytics.byProduct)) writeLine(`  - ${k}: ${v}`);
+    writeLine("Sold by Product", { size: 12, bold: true });
+    for (const [k, v] of Object.entries(analytics.wonByProduct)) writeLine(`  - ${k}: ${v}`);
+    y += 6;
+
     writeLine("Top Performers", { size: 14, bold: true });
     if (analytics.topUsers.length === 0) writeLine("  (none yet)");
     for (const u of analytics.topUsers) writeLine(`  - ${u.name}: ${u.wins} wins`);
