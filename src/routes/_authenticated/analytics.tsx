@@ -24,7 +24,6 @@ import {
   LabelList,
 } from "recharts";
 import { TrendingUp, Users, Trophy, AlertTriangle, MessageSquareText } from "lucide-react";
-import type { ChartConfig } from "@/components/ui/chart";
 
 export const Route = createFileRoute("/_authenticated/analytics")({
   component: AnalyticsPage,

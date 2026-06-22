@@ -90,9 +90,9 @@ function NewClient() {
         },
       });
       setPreview(result);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      toast.error(err.message ?? "Failed to run AI normalization");
+      toast.error(err instanceof Error ? err.message : "Failed to run AI normalization");
     } finally {
       setNormalizing(false);
     }
@@ -108,22 +108,31 @@ function NewClient() {
       const cf: Record<string, string> = {};
       customFields.forEach((kv) => { if (kv.key.trim()) cf[kv.key.trim()] = kv.value; });
 
-    const { data: client, error } = await supabase.from("clients").insert({
-      name: form.name.trim(),
-      email: form.email.trim() || null,
-      location: form.location.trim() || null,
-      contact_person: form.contact_person.trim() || null,
-      category: preview.category,
-      mode_of_connection: preview.modeOfConnection,
-      current_stage: form.stage,
-      stage_value: preview.stageValue,
-      stage_label: preview.stageLabel ?? null,
-      stage_notes: form.stage_notes,
-      custom_fields: cf,
-      created_by: u.user.id,
-    }).select("id").single();
+      const { data: client, error } = await supabase.from("clients").insert({
+        name: form.name.trim(),
+        email: form.email.trim() || null,
+        location: form.location.trim() || null,
+        contact_person: form.contact_person.trim() || null,
+        category: preview.category,
+        mode_of_connection: preview.modeOfConnection,
+        current_stage: form.stage,
+        stage_value: preview.stageValue,
+        stage_label: preview.stageLabel ?? null,
+        stage_notes: form.stage_notes,
+        custom_fields: cf,
+        created_by: u.user.id,
+      }).select("id").single();
 
-    if (error || !client) {
+      if (error || !client) {
+        toast.error(error?.message ?? "Failed to save client");
+      } else {
+        toast.success("Client created");
+        navigate({ to: "/clients" });
+      }
+    } catch (err: unknown) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Failed to save client");
+    } finally {
       setSaving(false);
     }
   }
