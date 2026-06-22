@@ -34,6 +34,18 @@ const RED = "oklch(0.62 0.23 25)";
 const RED_MUTED = "oklch(0.45 0.15 25)";
 const WHITE = "oklch(0.95 0 0)";
 
+const channelChartConfig: ChartConfig = {
+  value: { label: "Leads", color: "var(--color-value)" },
+} satisfies ChartConfig;
+
+const categoryChartConfig: ChartConfig = {
+  value: { label: "Clients", color: "var(--color-value)" },
+} satisfies ChartConfig;
+
+const timeseriesChartConfig: ChartConfig = {
+  count: { label: "Clients", color: "oklch(0.62 0.23 25)" },
+} satisfies ChartConfig;
+
 function AnalyticsPage() {
   const { data, isLoading } = useAnalyticsData();
   const { toggle } = useAIDrawer();
