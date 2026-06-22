@@ -46,6 +46,12 @@ const timeseriesChartConfig: ChartConfig = {
   count: { label: "Clients", color: "oklch(0.62 0.23 25)" },
 } satisfies ChartConfig;
 
+const STAGE_STYLES = [
+  { bg: "bg-stage-1/10", border: "border-stage-1/30", text: "text-stage-1" },
+  { bg: "bg-stage-2/10", border: "border-stage-2/30", text: "text-stage-2" },
+  { bg: "bg-stage-3/10", border: "border-stage-3/30", text: "text-stage-3" },
+];
+
 function AnalyticsPage() {
   const { data, isLoading } = useAnalyticsData();
   const { toggle } = useAIDrawer();
