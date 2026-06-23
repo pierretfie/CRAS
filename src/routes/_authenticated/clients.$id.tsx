@@ -142,7 +142,7 @@ function Detail({ k, v }: { k: string; v: string | null | undefined }) {
   );
 }
 
-function EditClientDialog({ client, onSaved }: { client: { id: string; name: string; email: string | null; location: string | null; contact_person: string | null }; onSaved: () => void }) {
+function EditClientDialog({ client, onSaved }: { client: { id: string; name: string; email: string | null; location: string | null; contact_person: string | null; product: string | null }; onSaved: () => void }) {
   const [open, setOpen] = useState(false);
   const { data: products } = useQuery({
     queryKey: ["admin_products"],
@@ -153,6 +153,7 @@ function EditClientDialog({ client, onSaved }: { client: { id: string; name: str
     email: client.email ?? "",
     location: client.location ?? "",
     contact_person: client.contact_person ?? "",
+    product: client.product ?? "",
   });
   const [saving, setSaving] = useState(false);
 
@@ -163,6 +164,7 @@ function EditClientDialog({ client, onSaved }: { client: { id: string; name: str
       email: form.email || null,
       location: form.location || null,
       contact_person: form.contact_person || null,
+      product: form.product || null,
     }).eq("id", client.id);
     setSaving(false);
     if (error) return toast.error(error.message);
@@ -183,6 +185,17 @@ function EditClientDialog({ client, onSaved }: { client: { id: string; name: str
           <div className="space-y-1"><Label>Email</Label><Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
           <div className="space-y-1"><Label>Location</Label><Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} /></div>
           <div className="space-y-1"><Label>Contact Person</Label><Input value={form.contact_person} onChange={(e) => setForm({ ...form, contact_person: e.target.value })} /></div>
+          <div className="space-y-1">
+            <Label>Product</Label>
+            <Select value={form.product} onValueChange={(v) => setForm({ ...form, product: v })}>
+              <SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger>
+              <SelectContent>
+                {products?.map((p: { id: string; name: string }) => (
+                  <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <DialogFooter>
           <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>

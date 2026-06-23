@@ -115,6 +115,7 @@ function NewClient() {
         contact_person: form.contact_person.trim() || null,
         category: preview.category,
         mode_of_connection: preview.modeOfConnection,
+        product: form.customProduct.trim() || form.product || null,
         current_stage: form.stage,
         stage_value: preview.stageValue,
         stage_label: preview.stageLabel ?? null,
