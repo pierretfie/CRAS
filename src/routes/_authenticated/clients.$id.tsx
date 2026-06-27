@@ -17,7 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { classifyStageValue } from "@/lib/utils";
 import { classifyStageValueAI } from "@/lib/api/ai.functions";
-import { createFollowUp, getActiveFollowUps, cancelFollowUp } from "@/lib/follow-ups";
+import { createFollowUp, getActiveFollowUps, cancelFollowUp, FollowUp } from "@/lib/follow-ups";
 import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/_authenticated/clients/$id")({
@@ -488,21 +488,24 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
 
 function FollowUpSection({ clientId }: { clientId: string }) {
   const { u } = useAuth();
-  const queryClient = useQueryClient();
-  const [followUps, setFollowUps] = useState<any[]>([]);
+  const [followUps, setFollowUps] = useState<FollowUp[]>([]);
 
   useEffect(() => {
     if (u?.user) {
       getActiveFollowUps(u.user.id).then(ups => {
         setFollowUps(ups.filter(f => f.client_id === clientId));
-      });
+      }).catch(console.error);
     }
-  }, [u, clientId]);
+  }, [u?.user?.id, clientId]);
 
   const handleCancel = async (id: string) => {
-    await cancelFollowUp(id);
-    setFollowUps(prev => prev.filter(f => f.id !== id));
-    toast.success("Follow-up cancelled");
+    try {
+      await cancelFollowUp(id);
+      setFollowUps(prev => prev.filter(f => f.id !== id));
+      toast.success("Follow-up cancelled");
+    } catch (err) {
+      toast.error("Failed to cancel follow-up");
+    }
   };
 
   if (followUps.length === 0) return null;
