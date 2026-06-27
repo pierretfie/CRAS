@@ -82,6 +82,53 @@ export type Database = {
           },
         ]
       }
+      client_follow_ups: {
+        Row: {
+          client_id: string
+          created_at: string
+          custom_interval_days: number | null
+          frequency: string
+          id: string
+          next_reminder: string
+          note: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          custom_interval_days?: number | null
+          frequency: string
+          id?: string
+          next_reminder: string
+          note?: string | null
+          status: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          custom_interval_days?: number | null
+          frequency?: string
+          id?: string
+          next_reminder?: string
+          note?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_follow_ups_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_stage_events: {
         Row: {
           client_id: string
