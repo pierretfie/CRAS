@@ -233,21 +233,23 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
   const [showFallback, setShowFallback] = useState(false);
   const [pendingEventType, setPendingEventType] = useState<"progress" | "regress" | "won" | "lost">("progress");
 
-  const classifyWithTimeout = async (desc: string, eventType: "progress" | "regress" | "won" | "lost") => {
+  const classifyWithTimeout = async (eventType: "progress" | "regress" | "won" | "lost") => {
     setAiLoading(true);
     try {
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("AI timeout")), 120000)
-      );
+      let timeoutId: ReturnType<typeof setTimeout>;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error("AI timeout")), 120000);
+      });
       const aiPromise = classifyStageValueAI({
         data: {
-          description: desc,
+          description,
           fromStage: client.current_stage,
           toStage: toStage,
           eventType: eventType,
         },
       });
       const result = await Promise.race([aiPromise, timeoutPromise]);
+      clearTimeout(timeoutId!);
       setAiLoading(false);
       return result.stageValue;
     } catch {
@@ -260,15 +262,12 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
   const retryClassification = async () => {
     const eventType: "progress" | "regress" | "won" | "lost" =
       mode === "won" ? "won" : mode === "lost" ? "lost" : toStage > client.current_stage ? "progress" : "regress";
-    const result = await classifyWithTimeout(description, eventType);
+    const result = await classifyWithTimeout(eventType);
     if (result !== null) {
-      setStageValue(result);
       setShowFallback(false);
       await doSave(result, eventType);
     }
   };
-
-  const [stageValue, setStageValue] = useState<number | null>(null);
 
   const doSave = async (stageVal: number, eventType: "progress" | "regress" | "won" | "lost") => {
     if (!description.trim()) return toast.error("Describe what happened");
@@ -335,12 +334,11 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
 
     // For progress/regress, try AI classification with timeout
     const stageVal = classifyStageValue(toStage, description);
-    const result = await classifyWithTimeout(description, eventType);
+    const result = await classifyWithTimeout(eventType);
     if (result !== null) {
       await doSave(result, eventType);
     } else {
       // Fallback will be shown, save will be triggered after user picks
-      setStageValue(stageVal);
     }
   }
 
@@ -413,32 +411,32 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
 
         <DialogFooter><Button onClick={save} disabled={saving || aiLoading}>{aiLoading ? "Classifying…" : saving ? "Saving…" : "Push update"}</Button></DialogFooter>
       </DialogContent>
-      {showFallback && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-lg p-6 max-w-sm w-full space-y-4">
-            <h3 className="text-lg font-semibold">AI Classification Unavailable</h3>
-            <p className="text-sm text-muted-foreground">Is this client progressing well?</p>
-            <div className="flex gap-3">
-              <Button variant="outline" className="flex-1 bg-green-50 hover:bg-green-100 text-green-700"
-                onClick={() => { setShowFallback(false); doSave(1, pendingEventType); }}>
-                On Track
-              </Button>
-              <Button variant="outline" className="flex-1 bg-red-50 hover:bg-red-100 text-red-700"
-                onClick={() => { setShowFallback(false); doSave(0, pendingEventType); }}>
-                At Risk
-              </Button>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="ghost" size="sm" onClick={() => { setShowFallback(false); retryClassification(); }}>
-                Retry AI
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setShowFallback(false)}>
-                Cancel
-              </Button>
-            </div>
+      <Dialog open={showFallback} onOpenChange={(open) => { if (!open) setShowFallback(false); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>AI Classification Unavailable</DialogTitle>
+            <DialogDescription>Is this client progressing well?</DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1"
+              onClick={() => { setShowFallback(false); doSave(1, pendingEventType); }}>
+              On Track
+            </Button>
+            <Button variant="destructive" className="flex-1"
+              onClick={() => { setShowFallback(false); doSave(0, pendingEventType); }}>
+              At Risk
+            </Button>
           </div>
-        </div>
-      )}
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={() => { setShowFallback(false); retryClassification(); }}>
+              Retry AI
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setShowFallback(false)}>
+              Cancel
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
