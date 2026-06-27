@@ -13,9 +13,11 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, Edit, TrendingUp, XCircle, Trophy } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { classifyStageValue } from "@/lib/utils";
 import { classifyStageValueAI } from "@/lib/api/ai.functions";
+import { createFollowUp } from "@/lib/follow-ups";
 
 export const Route = createFileRoute("/_authenticated/clients/$id")({
   component: ClientDetail,
@@ -232,6 +234,9 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
   const [aiLoading, setAiLoading] = useState(false);
   const [showFallback, setShowFallback] = useState(false);
   const [pendingEventType, setPendingEventType] = useState<"progress" | "regress" | "won" | "lost">("progress");
+  const [followUpEnabled, setFollowUpEnabled] = useState(false);
+  const [followUpFrequency, setFollowUpFrequency] = useState("daily");
+  const [followUpNote, setFollowUpNote] = useState("");
 
   const classifyWithTimeout = async (eventType: "progress" | "regress" | "won" | "lost") => {
     setAiLoading(true);
@@ -312,9 +317,15 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
     }
     setSaving(false);
     toast.success("Stage updated");
+    if (followUpEnabled) {
+      await createFollowUp(client.id, u.user.id, followUpFrequency, followUpNote || null);
+      toast.success("Follow-up scheduled");
+    }
     setOpen(false);
     setDescription("");
     setShowFallback(false);
+    setFollowUpEnabled(false);
+    setFollowUpNote("");
     onSaved();
   };
 
@@ -406,6 +417,33 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
               <span className="text-sm font-medium w-12 text-right">{interestScale.toFixed(1)}</span>
             </div>
             <p className="text-xs text-muted-foreground">1 = Low interest, 10 = Very high interest</p>
+          </div>
+
+          <div className="space-y-2 border-t pt-4">
+            <div className="flex items-center justify-between">
+              <Label>Set Follow-up?</Label>
+              <Switch checked={followUpEnabled} onCheckedChange={setFollowUpEnabled} />
+            </div>
+            {followUpEnabled && (
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <Label>Frequency</Label>
+                  <Select value={followUpFrequency} onValueChange={setFollowUpFrequency}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="daily">Daily</SelectItem>
+                      <SelectItem value="every_2_days">Every 2 Days</SelectItem>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="custom">Custom</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Note (optional)</Label>
+                  <Input placeholder="What to follow up about..." value={followUpNote} onChange={e => setFollowUpNote(e.target.value)} />
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
