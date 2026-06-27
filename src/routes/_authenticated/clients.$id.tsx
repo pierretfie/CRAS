@@ -15,6 +15,7 @@ import { ArrowLeft, Edit, TrendingUp, XCircle, Trophy } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
 import { classifyStageValue } from "@/lib/utils";
+import { classifyStageValueAI } from "@/lib/api/ai.functions";
 
 export const Route = createFileRoute("/_authenticated/clients/$id")({
   component: ClientDetail,
@@ -228,17 +229,54 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
   const [customReason, setCustomReason] = useState("");
   const [interestScale, setInterestScale] = useState(client.interest_scale ?? 5);
   const [saving, setSaving] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [showFallback, setShowFallback] = useState(false);
+  const [pendingEventType, setPendingEventType] = useState<"progress" | "regress" | "won" | "lost">("progress");
 
-  async function save() {
+  const classifyWithTimeout = async (desc: string, eventType: "progress" | "regress" | "won" | "lost") => {
+    setAiLoading(true);
+    try {
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("AI timeout")), 120000)
+      );
+      const aiPromise = classifyStageValueAI({
+        data: {
+          description: desc,
+          fromStage: client.current_stage,
+          toStage: toStage,
+          eventType: eventType,
+        },
+      });
+      const result = await Promise.race([aiPromise, timeoutPromise]);
+      setAiLoading(false);
+      return result.stageValue;
+    } catch {
+      setAiLoading(false);
+      setShowFallback(true);
+      return null;
+    }
+  };
+
+  const retryClassification = async () => {
+    const eventType: "progress" | "regress" | "won" | "lost" =
+      mode === "won" ? "won" : mode === "lost" ? "lost" : toStage > client.current_stage ? "progress" : "regress";
+    const result = await classifyWithTimeout(description, eventType);
+    if (result !== null) {
+      setStageValue(result);
+      setShowFallback(false);
+      await doSave(result, eventType);
+    }
+  };
+
+  const [stageValue, setStageValue] = useState<number | null>(null);
+
+  const doSave = async (stageVal: number, eventType: "progress" | "regress" | "won" | "lost") => {
     if (!description.trim()) return toast.error("Describe what happened");
     setSaving(true);
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) { setSaving(false); return toast.error("Not signed in"); }
 
     const reason = lostReason === "Other" ? customReason.trim() : lostReason;
-    const stageVal = classifyStageValue(toStage, description);
-    const eventType: "progress" | "regress" | "won" | "lost" =
-      mode === "won" ? "won" : mode === "lost" ? "lost" : toStage > client.current_stage ? "progress" : "regress";
 
     const update: { status?: "active" | "won" | "lost"; current_stage?: number; stage_value?: number; lost_reason?: string; stage_notes?: string } = {};
     if (mode === "won") { update.status = "won"; update.current_stage = 3; update.stage_value = 1; }
@@ -277,7 +315,33 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
     toast.success("Stage updated");
     setOpen(false);
     setDescription("");
+    setShowFallback(false);
     onSaved();
+  };
+
+  async function save() {
+    if (!description.trim()) return toast.error("Describe what happened");
+
+    const eventType: "progress" | "regress" | "won" | "lost" =
+      mode === "won" ? "won" : mode === "lost" ? "lost" : toStage > client.current_stage ? "progress" : "regress";
+    setPendingEventType(eventType);
+
+    // For won/lost, use fixed stage values directly
+    if (mode === "won" || mode === "lost") {
+      const stageVal = mode === "won" ? 1 : 0;
+      await doSave(stageVal, eventType);
+      return;
+    }
+
+    // For progress/regress, try AI classification with timeout
+    const stageVal = classifyStageValue(toStage, description);
+    const result = await classifyWithTimeout(description, eventType);
+    if (result !== null) {
+      await doSave(result, eventType);
+    } else {
+      // Fallback will be shown, save will be triggered after user picks
+      setStageValue(stageVal);
+    }
   }
 
   return (
@@ -347,8 +411,34 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
           </div>
         </div>
 
-        <DialogFooter><Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Push update"}</Button></DialogFooter>
+        <DialogFooter><Button onClick={save} disabled={saving || aiLoading}>{aiLoading ? "Classifying…" : saving ? "Saving…" : "Push update"}</Button></DialogFooter>
       </DialogContent>
+      {showFallback && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full space-y-4">
+            <h3 className="text-lg font-semibold">AI Classification Unavailable</h3>
+            <p className="text-sm text-muted-foreground">Is this client progressing well?</p>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1 bg-green-50 hover:bg-green-100 text-green-700"
+                onClick={() => { setShowFallback(false); doSave(1, pendingEventType); }}>
+                On Track
+              </Button>
+              <Button variant="outline" className="flex-1 bg-red-50 hover:bg-red-100 text-red-700"
+                onClick={() => { setShowFallback(false); doSave(0, pendingEventType); }}>
+                At Risk
+              </Button>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="ghost" size="sm" onClick={() => { setShowFallback(false); retryClassification(); }}>
+                Retry AI
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setShowFallback(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </Dialog>
   );
 }
