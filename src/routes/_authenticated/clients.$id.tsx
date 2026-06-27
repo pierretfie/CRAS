@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, Edit, TrendingUp, XCircle, Trophy } from "lucide-react";
 import { toast } from "sonner";
-import { classifyStageValueAI } from "@/lib/api/ai.functions";
+import { classifyStageValue } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/clients/$id")({
   component: ClientDetail,
@@ -60,12 +60,6 @@ function ClientDetail() {
               client.current_stage === 3 ? "border-stage-3/30 text-stage-3 bg-stage-3/10" :
               ""
             }>Stage {client.current_stage}{client.stage_label ? ` · ${client.stage_label}` : ""}</Badge>
-            {client.stage_value === 1 && (
-              <Badge variant="outline" className="border-green-500/30 text-green-500 bg-green-500/10">On Track</Badge>
-            )}
-            {client.stage_value === 0 && (
-              <Badge variant="outline" className="border-red-500/30 text-red-500 bg-red-500/10">At Risk</Badge>
-            )}
             <Badge variant={client.status === "won" ? "default" : client.status === "lost" ? "destructive" : "secondary"}>{client.status}</Badge>
             <Badge variant="outline">{client.category}</Badge>
             {client.product && <Badge variant="outline">{client.product}</Badge>}
@@ -89,11 +83,7 @@ function ClientDetail() {
           <Detail k="Contact Phone" v={client.contact_person_phone} />
           <Detail k="Contact Email" v={client.contact_person_email} />
           <Detail k="Contact Role" v={client.contact_person_role} />
-          <Detail
-            k="Progress Status"
-            v={client.stage_value === 1 ? "On Track" : client.stage_value === 0 ? "At Risk" : "Unknown"}
-            vClassName={client.stage_value === 1 ? "text-stage-3" : client.stage_value === 0 ? "text-stage-1" : ""}
-          />
+          <Detail k="Stage Value" v={String(client.stage_value)} />
           {client.lost_reason && <Detail k="Lost Reason" v={client.lost_reason} />}
           <Detail k="Created" v={new Date(client.created_at).toLocaleDateString()} />
           <Detail k="Updated" v={new Date(client.updated_at).toLocaleDateString()} />
@@ -146,11 +136,11 @@ function ClientDetail() {
   );
 }
 
-function Detail({ k, v, vClassName }: { k: string; v: string | null | undefined; vClassName?: string }) {
+function Detail({ k, v }: { k: string; v: string | null | undefined }) {
   return (
     <div>
       <div className="text-xs text-muted-foreground">{k}</div>
-      <div className={`font-medium ${vClassName ?? ""}`}>{v ?? "—"}</div>
+      <div className="font-medium">{v ?? "—"}</div>
     </div>
   );
 }
@@ -227,12 +217,11 @@ function EditClientDialog({ client, onSaved }: { client: { id: string; name: str
   );
 }
 
-function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_stage: number; status: string; stage_value: number | null; lost_reason: string | null; stage_notes: string | null }; onSaved: () => void }) {
+function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_stage: number }; onSaved: () => void }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"progress" | "won" | "lost">("progress");
   const [toStage, setToStage] = useState(client.current_stage);
   const [description, setDescription] = useState("");
-  const [stageValue, setStageValue] = useState<1 | 0>(1);
   const [lostReason, setLostReason] = useState("Unresponsive");
   const [customReason, setCustomReason] = useState("");
   const [saving, setSaving] = useState(false);
@@ -244,20 +233,21 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
     if (!u.user) { setSaving(false); return toast.error("Not signed in"); }
 
     const reason = lostReason === "Other" ? customReason.trim() : lostReason;
+    const stageVal = classifyStageValue(toStage, description);
     const eventType: "progress" | "regress" | "won" | "lost" =
       mode === "won" ? "won" : mode === "lost" ? "lost" : toStage > client.current_stage ? "progress" : "regress";
 
     const update: { status?: "active" | "won" | "lost"; current_stage?: number; stage_value?: number; lost_reason?: string; stage_notes?: string } = {};
     if (mode === "won") { update.status = "won"; update.current_stage = 3; update.stage_value = 1; }
     else if (mode === "lost") { update.status = "lost"; update.lost_reason = reason; }
-    else { update.current_stage = toStage; update.stage_value = stageValue; update.stage_notes = description; }
+    else { update.current_stage = toStage; update.stage_value = stageVal; update.stage_notes = description; }
 
     // Update clients table
-    const status = update.status ?? client.status;
-    const current_stage = update.current_stage ?? client.current_stage;
-    const stage_value = update.stage_value ?? client.stage_value;
-    const lost_reason = update.lost_reason ?? client.lost_reason;
-    const stage_notes = update.stage_notes ?? client.stage_notes;
+    const status = update.status ?? null;
+    const current_stage = update.current_stage ?? null;
+    const stage_value = update.stage_value ?? null;
+    const lost_reason = update.lost_reason ?? null;
+    const stage_notes = update.stage_notes ?? null;
     const clientRes = await query(
       `UPDATE clients SET status = $1, current_stage = $2, stage_value = $3, lost_reason = $4, stage_notes = $5 WHERE id = $6`,
       [status, current_stage, stage_value, lost_reason, stage_notes, client.id]
@@ -269,7 +259,7 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
 
     // Insert into client_stage_events
     const toStageVal = mode === "won" ? 3 : mode === "lost" ? null : toStage;
-    const stageValInsert = mode === "won" ? 1 : mode === "lost" ? 0 : stageValue;
+    const stageValInsert = mode === "won" ? 1 : mode === "lost" ? 0 : stageVal;
     const lostReasonInsert = mode === "lost" ? reason : null;
     const eventRes = await query(
       `INSERT INTO client_stage_events (client_id, user_id, from_stage, to_stage, event_type, description, lost_reason, stage_value)
@@ -336,33 +326,6 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
             <Label>What happened</Label>
             <Textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe the update…" />
           </div>
-
-          {mode === "progress" && (
-            <div className="space-y-1">
-              <Label>Progress Status</Label>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant={stageValue === 1 ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setStageValue(1)}
-                  className={stageValue === 1 ? "bg-green-600 hover:bg-green-700" : ""}
-                >
-                  On Track
-                </Button>
-                <Button
-                  type="button"
-                  variant={stageValue === 0 ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setStageValue(0)}
-                  className={stageValue === 0 ? "bg-red-600 hover:bg-red-700" : ""}
-                >
-                  At Risk
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">Is this client progressing well or at risk?</p>
-            </div>
-          )}
         </div>
 
         <DialogFooter><Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Push update"}</Button></DialogFooter>
