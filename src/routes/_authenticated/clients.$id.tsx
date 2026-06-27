@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { query } from "@/lib/db";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,13 +11,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Edit, TrendingUp, XCircle, Trophy } from "lucide-react";
+import { ArrowLeft, Edit, TrendingUp, XCircle, Trophy, Bell } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { classifyStageValue } from "@/lib/utils";
 import { classifyStageValueAI } from "@/lib/api/ai.functions";
-import { createFollowUp } from "@/lib/follow-ups";
+import { createFollowUp, getActiveFollowUps, cancelFollowUp } from "@/lib/follow-ups";
+import { useAuth } from "@/hooks/use-auth";
 
 export const Route = createFileRoute("/_authenticated/clients/$id")({
   component: ClientDetail,
@@ -137,6 +138,8 @@ function ClientDetail() {
           )}
         </CardContent>
       </Card>
+
+      <FollowUpSection clientId={client.id} />
     </div>
   );
 }
@@ -480,5 +483,53 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
         </DialogContent>
       </Dialog>
     </Dialog>
+  );
+}
+
+function FollowUpSection({ clientId }: { clientId: string }) {
+  const { u } = useAuth();
+  const queryClient = useQueryClient();
+  const [followUps, setFollowUps] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (u?.user) {
+      getActiveFollowUps(u.user.id).then(ups => {
+        setFollowUps(ups.filter(f => f.client_id === clientId));
+      });
+    }
+  }, [u, clientId]);
+
+  const handleCancel = async (id: string) => {
+    await cancelFollowUp(id);
+    setFollowUps(prev => prev.filter(f => f.id !== id));
+    toast.success("Follow-up cancelled");
+  };
+
+  if (followUps.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Bell className="h-4 w-4" /> Active Follow-ups
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {followUps.map(f => (
+          <div key={f.id} className="flex items-center justify-between p-2 border rounded">
+            <div>
+              <p className="text-sm font-medium capitalize">{f.frequency.replace("_", " ")}</p>
+              <p className="text-xs text-muted-foreground">
+                Next: {new Date(f.next_reminder).toLocaleDateString()}
+              </p>
+              {f.note && <p className="text-xs text-muted-foreground">{f.note}</p>}
+            </div>
+            <Button variant="ghost" size="sm" onClick={() => handleCancel(f.id)}>
+              Cancel
+            </Button>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }
