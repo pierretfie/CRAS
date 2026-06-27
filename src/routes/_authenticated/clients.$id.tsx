@@ -318,8 +318,12 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
     setSaving(false);
     toast.success("Stage updated");
     if (followUpEnabled) {
-      await createFollowUp(client.id, u.user.id, followUpFrequency, followUpNote || null);
-      toast.success("Follow-up scheduled");
+      try {
+        await createFollowUp(client.id, u.user.id, followUpFrequency, followUpNote || null);
+        toast.success("Follow-up scheduled");
+      } catch (err) {
+        toast.error("Failed to schedule follow-up");
+      }
     }
     setOpen(false);
     setDescription("");
