@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, Edit, TrendingUp, XCircle, Trophy } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
 import { classifyStageValue } from "@/lib/utils";
 
@@ -84,6 +85,7 @@ function ClientDetail() {
           <Detail k="Contact Email" v={client.contact_person_email} />
           <Detail k="Contact Role" v={client.contact_person_role} />
           <Detail k="Stage Value" v={String(client.stage_value)} />
+          <Detail k="Interest Scale" v={client.interest_scale?.toFixed(1)} />
           {client.lost_reason && <Detail k="Lost Reason" v={client.lost_reason} />}
           <Detail k="Created" v={new Date(client.created_at).toLocaleDateString()} />
           <Detail k="Updated" v={new Date(client.updated_at).toLocaleDateString()} />
@@ -217,13 +219,14 @@ function EditClientDialog({ client, onSaved }: { client: { id: string; name: str
   );
 }
 
-function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_stage: number }; onSaved: () => void }) {
+function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_stage: number; interest_scale: number | null }; onSaved: () => void }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"progress" | "won" | "lost">("progress");
   const [toStage, setToStage] = useState(client.current_stage);
   const [description, setDescription] = useState("");
   const [lostReason, setLostReason] = useState("Unresponsive");
   const [customReason, setCustomReason] = useState("");
+  const [interestScale, setInterestScale] = useState(client.interest_scale ?? 5);
   const [saving, setSaving] = useState(false);
 
   async function save() {
@@ -249,8 +252,8 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
     const lost_reason = update.lost_reason ?? null;
     const stage_notes = update.stage_notes ?? null;
     const clientRes = await query(
-      `UPDATE clients SET status = $1, current_stage = $2, stage_value = $3, lost_reason = $4, stage_notes = $5 WHERE id = $6`,
-      [status, current_stage, stage_value, lost_reason, stage_notes, client.id]
+      `UPDATE clients SET status = $1, current_stage = $2, stage_value = $3, lost_reason = $4, stage_notes = $5, interest_scale = $6 WHERE id = $7`,
+      [status, current_stage, stage_value, lost_reason, stage_notes, interestScale, client.id]
     );
     if (clientRes.error) {
       setSaving(false);
@@ -325,6 +328,22 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
           <div className="space-y-1">
             <Label>What happened</Label>
             <Textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe the update…" />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Interest Scale</Label>
+            <div className="flex items-center gap-4">
+              <Slider
+                min={1}
+                max={10}
+                step={0.1}
+                value={[interestScale]}
+                onValueChange={([v]) => setInterestScale(v)}
+                className="flex-1"
+              />
+              <span className="text-sm font-medium w-12 text-right">{interestScale.toFixed(1)}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">1 = Low interest, 10 = Very high interest</p>
           </div>
         </div>
 
