@@ -6,8 +6,10 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { Button } from "@/components/ui/button";
 import { LogOut, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
+import { requestNotificationPermission } from "@/lib/browser-notifications";
 import { useAIDrawer } from "@/hooks/use-ai-drawer";
 import { AIAssistantDrawer } from "@/components/ai-assistant-drawer";
+import { FollowUpNotifications } from "@/components/follow-up-notifications";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -19,10 +21,52 @@ export const Route = createFileRoute("/_authenticated")({
   component: AuthedLayout,
 });
 
+function useScrollPersistence() {
+  const KEY = "cras-scroll-position";
+
+  useEffect(() => {
+    // Restore scroll position on mount
+    const saved = sessionStorage.getItem(KEY);
+    if (saved) {
+      requestAnimationFrame(() => {
+        window.scrollTo(0, parseInt(saved, 10));
+      });
+    }
+
+    // Save scroll position before unload
+    const handleBeforeUnload = () => {
+      sessionStorage.setItem(KEY, String(window.scrollY));
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    // Also save on scroll (debounced)
+    let timeout: ReturnType<typeof setTimeout>;
+    const handleScroll = () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        sessionStorage.setItem(KEY, String(window.scrollY));
+      }, 100);
+    };
+    window.addEventListener("scroll", handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("scroll", handleScroll);
+      clearTimeout(timeout);
+    };
+  }, []);
+}
+
 function AuthedLayout() {
   const navigate = useNavigate();
   const [checking, setChecking] = useState(true);
   const { toggle } = useAIDrawer();
+
+  useScrollPersistence();
+
+  useEffect(() => {
+    requestNotificationPermission();
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -53,17 +97,20 @@ function AuthedLayout() {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="flex min-h-screen w-full">
         <AppSidebar />
-        <SidebarInset className="flex flex-col">
+        <SidebarInset className="flex flex-col flex-1 min-w-0">
           <header className="h-14 flex items-center justify-between border-b px-4 sticky top-0 bg-background/95 backdrop-blur z-10">
             <div className="flex items-center gap-2">
               <SidebarTrigger />
               <span className="font-semibold tracking-tight">CRAS</span>
             </div>
-            <Button variant="ghost" size="sm" onClick={signOut}>
-              <LogOut className="h-4 w-4 mr-1" /> Sign out
-            </Button>
+            <div className="flex items-center gap-2">
+              <FollowUpNotifications />
+              <Button variant="ghost" size="sm" onClick={signOut}>
+                <LogOut className="h-4 w-4 mr-1" /> Sign out
+              </Button>
+            </div>
           </header>
           <main className="flex-1 p-4 md:p-6">
             <Outlet />
