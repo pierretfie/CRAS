@@ -140,6 +140,7 @@ export type Database = {
           created_by: string
           current_stage: number
           custom_fields: Json
+          interest_scale: number
           email: string | null
           id: string
           location: string | null
@@ -163,6 +164,7 @@ export type Database = {
           created_by: string
           current_stage?: number
           custom_fields?: Json
+          interest_scale?: number
           email?: string | null
           id?: string
           location?: string | null
@@ -186,6 +188,7 @@ export type Database = {
           created_by?: string
           current_stage?: number
           custom_fields?: Json
+          interest_scale?: number
           email?: string | null
           id?: string
           location?: string | null

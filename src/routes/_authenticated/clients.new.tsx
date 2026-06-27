@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
 import { Plus, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -65,6 +66,7 @@ function NewClient() {
   const [preview, setPreview] = useState<null | { category: string; modeOfConnection: string; stageValue: number; stageLabel?: string; reasoning: string }>(null);
   const [normalizing, setNormalizing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [interestScale, setInterestScale] = useState(5);
 
   function set<K extends keyof typeof form>(k: K, v: (typeof form)[K]) {
     setForm((f) => ({ ...f, [k]: v }));
@@ -124,6 +126,7 @@ function NewClient() {
         stage_label: preview.stageLabel ?? null,
         stage_notes: form.stage_notes,
         custom_fields: cf,
+        interest_scale: interestScale,
         created_by: u.user.id,
       }).select("id").single();
 
@@ -173,6 +176,22 @@ function NewClient() {
             </Select>
             <Input className="mt-2" placeholder="Or type custom" value={form.customProduct} onChange={(e) => set("customProduct", e.target.value)} />
           </Field>
+
+          <div className="space-y-2 md:col-span-2">
+            <Label>Interest Scale</Label>
+            <div className="flex items-center gap-4">
+              <Slider
+                min={1}
+                max={10}
+                step={0.1}
+                value={[interestScale]}
+                onValueChange={([v]) => setInterestScale(v)}
+                className="flex-1"
+              />
+              <span className="text-sm font-medium w-12 text-right">{interestScale.toFixed(1)}</span>
+            </div>
+            <p className="text-xs text-muted-foreground">1 = Low interest, 10 = Very high interest</p>
+          </div>
 
           <Field label="Category">
             <Select value={form.category} onValueChange={(v) => set("category", v)}>
