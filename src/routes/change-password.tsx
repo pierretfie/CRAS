@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { query } from "@/lib/db";
+import { clearMustChangePassword } from "@/lib/api/profile.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,11 +25,19 @@ function ChangePassword() {
     const { error: pErr } = await supabase.auth.updateUser({ password: pwd });
     if (pErr) {
       setLoading(false);
-      return toast.error(pErr.message);
+      // Generic message — avoid surfacing raw Supabase/Postgres error detail.
+      return toast.error("Couldn't update your password. Please try again.");
     }
-    const { data: u } = await supabase.auth.getUser();
-    if (u.user) {
-      await query('UPDATE profiles SET must_change_password = false WHERE id = $1', [u.user.id]);
+    try {
+      // SECURITY: replaces a previous raw query('UPDATE profiles ... WHERE id = $1',
+      // [u.user.id]) call made directly from this client component. This new
+      // server function derives the user id from the verified session token
+      // server-side (see profile.functions.ts) instead of trusting a
+      // locally-read id passed from the browser.
+      await clearMustChangePassword();
+    } catch {
+      // Non-fatal — the password itself was already updated successfully.
+      // Worst case the user is prompted again next login, which is safe.
     }
     setLoading(false);
     toast.success("Password updated");
@@ -37,9 +45,10 @@ function ChangePassword() {
   }
 
   async function skip() {
-    const { data: u } = await supabase.auth.getUser();
-    if (u.user) {
-      await query('UPDATE profiles SET must_change_password = false WHERE id = $1', [u.user.id]);
+    try {
+      await clearMustChangePassword();
+    } catch {
+      // ignore — see note in handle()
     }
     navigate({ to: "/analytics" });
   }
@@ -55,7 +64,14 @@ function ChangePassword() {
           <form onSubmit={handle} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="password">New password</Label>
-              <Input id="password" name="password" type="password" minLength={6} required />
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                minLength={8}
+                autoComplete="new-password"
+                required
+              />
             </div>
             <div className="flex gap-2">
               <Button type="submit" className="flex-1" disabled={loading}>

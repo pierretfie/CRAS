@@ -1,8 +1,9 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Activity, Users, BarChart3, MessageSquareText, Shield, PlusCircle } from "lucide-react";
+import { Activity, Users, BarChart3, MessageSquareText, Shield, PlusCircle, Bell, BookOpen, Info, UserCircle, CalendarDays } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -20,13 +21,18 @@ export function AppSidebar() {
   const { toggle } = useAIDrawer();
   const path = useRouterState({ select: (r) => r.location.pathname });
   const isActive = (url: string) =>
-    url === "/clients" ? path === "/clients" || path.startsWith("/clients/") && path !== "/clients/new" : path === url;
+    url === "/clients"
+      ? path === "/clients" || (path.startsWith("/clients/") && path !== "/clients/new")
+      : path === url || path.startsWith(url + "/");
 
   const baseItems = [
     { title: "Analytics", url: "/analytics", icon: BarChart3 },
     { title: "AI Assistant", icon: MessageSquareText, onClick: toggle },
     { title: "Clients", url: "/clients", icon: Users },
     { title: "New Client", url: "/clients/new", icon: PlusCircle },
+    { title: "Follow-ups", url: "/follow-ups", icon: Bell },
+    { title: "Sales KPIs", url: "/metrics", icon: BookOpen },
+    { title: "About", url: "/about", icon: Info },
   ];
 
   return (
@@ -34,7 +40,12 @@ export function AppSidebar() {
       <SidebarHeader>
         <div className="flex items-center gap-2 px-2 py-2">
           <Activity className="h-5 w-5 text-primary" />
-          <span className="font-bold tracking-tight">CRAS</span>
+          <div className="flex flex-col min-w-0">
+            <span className="font-bold tracking-tight leading-tight">CRAS</span>
+            {data?.company?.name && (
+              <span className="text-[10px] text-muted-foreground truncate leading-tight">{data.company.name}</span>
+            )}
+          </div>
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -42,7 +53,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Workspace</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {baseItems.map((item, idx) => (
+              {baseItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   {item.onClick ? (
                     <SidebarMenuButton onClick={item.onClick} className="cursor-pointer">
@@ -59,6 +70,23 @@ export function AppSidebar() {
                   )}
                 </SidebarMenuItem>
               ))}
+
+              {/* Calendar — coming soon */}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  disabled
+                  className="cursor-not-allowed opacity-50"
+                  title="Coming soon"
+                >
+                  <CalendarDays className="h-4 w-4" />
+                  <span className="flex items-center gap-2">
+                    Calendar
+                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-primary/15 text-primary leading-none">
+                      soon
+                    </span>
+                  </span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -81,6 +109,21 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
       </SidebarContent>
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild isActive={path === "/profile"}>
+              <Link to="/profile">
+                <UserCircle className="h-4 w-4" />
+                <div className="flex flex-col min-w-0">
+                  <span className="truncate">{data?.profile?.name ?? "My Profile"}</span>
+                  <span className="text-[10px] text-muted-foreground truncate">{data?.user?.email}</span>
+                </div>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
     </Sidebar>
   );
 }

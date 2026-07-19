@@ -1,0 +1,43 @@
+appId: com.cras.analytics
+productName: CRAS
+copyright: Copyright 2026 CRAS
+
+directories:
+  buildResources: build
+  output: release
+
+files:
+  - dist-electron/**/*.js
+  - dist/client/**/*
+  - dist/server/**/*
+  - package.json
+  - node_modules/**/*
+  - src/assets/**
+
+extraResources:
+  - from: .env
+    to: .env
+
+linux:
+  target:
+    - deb
+    - AppImage
+  category: Office
+
+win:
+  target:
+    - nsis
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: CRAS
+
+publish:
+  provider: github
+  owner: pierretfie
+  repo: cras
+  releaseType: release

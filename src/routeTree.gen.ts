@@ -14,12 +14,16 @@ import { Route as ChangePasswordRouteImport } from './routes/change-password'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiChatStreamRouteImport } from './routes/api/chat-stream'
+import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
+import { Route as AuthenticatedMetricsRouteImport } from './routes/_authenticated/metrics'
+import { Route as AuthenticatedFollowUpsRouteImport } from './routes/_authenticated/follow-ups'
 import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedAboutRouteImport } from './routes/_authenticated/about'
 import { Route as AuthenticatedClientsIndexRouteImport } from './routes/_authenticated/clients.index'
 import { Route as AuthenticatedClientsNewRouteImport } from './routes/_authenticated/clients.new'
 import { Route as AuthenticatedClientsIdRouteImport } from './routes/_authenticated/clients.$id'
-import { Route as AuthenticatedAnalyticsReportRouteImport } from './routes/_authenticated/analytics.report'
 
 const RunMigrationsRoute = RunMigrationsRouteImport.update({
   id: '/run-migrations',
@@ -45,6 +49,26 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiChatStreamRoute = ApiChatStreamRouteImport.update({
+  id: '/api/chat-stream',
+  path: '/api/chat-stream',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedMetricsRoute = AuthenticatedMetricsRouteImport.update({
+  id: '/metrics',
+  path: '/metrics',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedFollowUpsRoute = AuthenticatedFollowUpsRouteImport.update({
+  id: '/follow-ups',
+  path: '/follow-ups',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAnalyticsRoute = AuthenticatedAnalyticsRouteImport.update({
   id: '/analytics',
   path: '/analytics',
@@ -53,6 +77,11 @@ const AuthenticatedAnalyticsRoute = AuthenticatedAnalyticsRouteImport.update({
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAboutRoute = AuthenticatedAboutRouteImport.update({
+  id: '/about',
+  path: '/about',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedClientsIndexRoute =
@@ -71,21 +100,19 @@ const AuthenticatedClientsIdRoute = AuthenticatedClientsIdRouteImport.update({
   path: '/clients/$id',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedAnalyticsReportRoute =
-  AuthenticatedAnalyticsReportRouteImport.update({
-    id: '/report',
-    path: '/report',
-    getParentRoute: () => AuthenticatedAnalyticsRoute,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/change-password': typeof ChangePasswordRoute
   '/run-migrations': typeof RunMigrationsRoute
+  '/about': typeof AuthenticatedAboutRoute
   '/admin': typeof AuthenticatedAdminRoute
-  '/analytics': typeof AuthenticatedAnalyticsRouteWithChildren
-  '/analytics/report': typeof AuthenticatedAnalyticsReportRoute
+  '/analytics': typeof AuthenticatedAnalyticsRoute
+  '/follow-ups': typeof AuthenticatedFollowUpsRoute
+  '/metrics': typeof AuthenticatedMetricsRoute
+  '/profile': typeof AuthenticatedProfileRoute
+  '/api/chat-stream': typeof ApiChatStreamRoute
   '/clients/$id': typeof AuthenticatedClientsIdRoute
   '/clients/new': typeof AuthenticatedClientsNewRoute
   '/clients/': typeof AuthenticatedClientsIndexRoute
@@ -95,9 +122,13 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/change-password': typeof ChangePasswordRoute
   '/run-migrations': typeof RunMigrationsRoute
+  '/about': typeof AuthenticatedAboutRoute
   '/admin': typeof AuthenticatedAdminRoute
-  '/analytics': typeof AuthenticatedAnalyticsRouteWithChildren
-  '/analytics/report': typeof AuthenticatedAnalyticsReportRoute
+  '/analytics': typeof AuthenticatedAnalyticsRoute
+  '/follow-ups': typeof AuthenticatedFollowUpsRoute
+  '/metrics': typeof AuthenticatedMetricsRoute
+  '/profile': typeof AuthenticatedProfileRoute
+  '/api/chat-stream': typeof ApiChatStreamRoute
   '/clients/$id': typeof AuthenticatedClientsIdRoute
   '/clients/new': typeof AuthenticatedClientsNewRoute
   '/clients': typeof AuthenticatedClientsIndexRoute
@@ -109,9 +140,13 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/change-password': typeof ChangePasswordRoute
   '/run-migrations': typeof RunMigrationsRoute
+  '/_authenticated/about': typeof AuthenticatedAboutRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
-  '/_authenticated/analytics': typeof AuthenticatedAnalyticsRouteWithChildren
-  '/_authenticated/analytics/report': typeof AuthenticatedAnalyticsReportRoute
+  '/_authenticated/analytics': typeof AuthenticatedAnalyticsRoute
+  '/_authenticated/follow-ups': typeof AuthenticatedFollowUpsRoute
+  '/_authenticated/metrics': typeof AuthenticatedMetricsRoute
+  '/_authenticated/profile': typeof AuthenticatedProfileRoute
+  '/api/chat-stream': typeof ApiChatStreamRoute
   '/_authenticated/clients/$id': typeof AuthenticatedClientsIdRoute
   '/_authenticated/clients/new': typeof AuthenticatedClientsNewRoute
   '/_authenticated/clients/': typeof AuthenticatedClientsIndexRoute
@@ -123,9 +158,13 @@ export interface FileRouteTypes {
     | '/auth'
     | '/change-password'
     | '/run-migrations'
+    | '/about'
     | '/admin'
     | '/analytics'
-    | '/analytics/report'
+    | '/follow-ups'
+    | '/metrics'
+    | '/profile'
+    | '/api/chat-stream'
     | '/clients/$id'
     | '/clients/new'
     | '/clients/'
@@ -135,9 +174,13 @@ export interface FileRouteTypes {
     | '/auth'
     | '/change-password'
     | '/run-migrations'
+    | '/about'
     | '/admin'
     | '/analytics'
-    | '/analytics/report'
+    | '/follow-ups'
+    | '/metrics'
+    | '/profile'
+    | '/api/chat-stream'
     | '/clients/$id'
     | '/clients/new'
     | '/clients'
@@ -148,9 +191,13 @@ export interface FileRouteTypes {
     | '/auth'
     | '/change-password'
     | '/run-migrations'
+    | '/_authenticated/about'
     | '/_authenticated/admin'
     | '/_authenticated/analytics'
-    | '/_authenticated/analytics/report'
+    | '/_authenticated/follow-ups'
+    | '/_authenticated/metrics'
+    | '/_authenticated/profile'
+    | '/api/chat-stream'
     | '/_authenticated/clients/$id'
     | '/_authenticated/clients/new'
     | '/_authenticated/clients/'
@@ -162,6 +209,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   ChangePasswordRoute: typeof ChangePasswordRoute
   RunMigrationsRoute: typeof RunMigrationsRoute
+  ApiChatStreamRoute: typeof ApiChatStreamRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -201,6 +249,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/chat-stream': {
+      id: '/api/chat-stream'
+      path: '/api/chat-stream'
+      fullPath: '/api/chat-stream'
+      preLoaderRoute: typeof ApiChatStreamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/profile': {
+      id: '/_authenticated/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof AuthenticatedProfileRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/metrics': {
+      id: '/_authenticated/metrics'
+      path: '/metrics'
+      fullPath: '/metrics'
+      preLoaderRoute: typeof AuthenticatedMetricsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/follow-ups': {
+      id: '/_authenticated/follow-ups'
+      path: '/follow-ups'
+      fullPath: '/follow-ups'
+      preLoaderRoute: typeof AuthenticatedFollowUpsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/analytics': {
       id: '/_authenticated/analytics'
       path: '/analytics'
@@ -213,6 +289,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/about': {
+      id: '/_authenticated/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AuthenticatedAboutRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/clients/': {
@@ -236,41 +319,28 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClientsIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/analytics/report': {
-      id: '/_authenticated/analytics/report'
-      path: '/report'
-      fullPath: '/analytics/report'
-      preLoaderRoute: typeof AuthenticatedAnalyticsReportRouteImport
-      parentRoute: typeof AuthenticatedAnalyticsRoute
-    }
   }
 }
-
-interface AuthenticatedAnalyticsRouteChildren {
-  AuthenticatedAnalyticsReportRoute: typeof AuthenticatedAnalyticsReportRoute
-}
-
-const AuthenticatedAnalyticsRouteChildren: AuthenticatedAnalyticsRouteChildren =
-  {
-    AuthenticatedAnalyticsReportRoute: AuthenticatedAnalyticsReportRoute,
-  }
-
-const AuthenticatedAnalyticsRouteWithChildren =
-  AuthenticatedAnalyticsRoute._addFileChildren(
-    AuthenticatedAnalyticsRouteChildren,
-  )
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAboutRoute: typeof AuthenticatedAboutRoute
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
-  AuthenticatedAnalyticsRoute: typeof AuthenticatedAnalyticsRouteWithChildren
+  AuthenticatedAnalyticsRoute: typeof AuthenticatedAnalyticsRoute
+  AuthenticatedFollowUpsRoute: typeof AuthenticatedFollowUpsRoute
+  AuthenticatedMetricsRoute: typeof AuthenticatedMetricsRoute
+  AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedClientsIdRoute: typeof AuthenticatedClientsIdRoute
   AuthenticatedClientsNewRoute: typeof AuthenticatedClientsNewRoute
   AuthenticatedClientsIndexRoute: typeof AuthenticatedClientsIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAboutRoute: AuthenticatedAboutRoute,
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
-  AuthenticatedAnalyticsRoute: AuthenticatedAnalyticsRouteWithChildren,
+  AuthenticatedAnalyticsRoute: AuthenticatedAnalyticsRoute,
+  AuthenticatedFollowUpsRoute: AuthenticatedFollowUpsRoute,
+  AuthenticatedMetricsRoute: AuthenticatedMetricsRoute,
+  AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedClientsIdRoute: AuthenticatedClientsIdRoute,
   AuthenticatedClientsNewRoute: AuthenticatedClientsNewRoute,
   AuthenticatedClientsIndexRoute: AuthenticatedClientsIndexRoute,
@@ -285,6 +355,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   ChangePasswordRoute: ChangePasswordRoute,
   RunMigrationsRoute: RunMigrationsRoute,
+  ApiChatStreamRoute: ApiChatStreamRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

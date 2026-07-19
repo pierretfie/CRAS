@@ -29,7 +29,7 @@ export function classifyStageValue(stage: number, description: string): number {
   const d = description.toLowerCase();
   if (NEGATIVE.some((k) => d.includes(k))) return 0;
   if (POSITIVE.some((k) => d.includes(k))) return 1;
-  // default: stage 3 leans 1 if description has any substance
-  if (stage === 3 && d.length > 20) return 1;
+  // Default: any substantive description is positive progression
+  if (d.length > 5) return 1;
   return 0;
 }

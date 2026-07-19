@@ -10,6 +10,7 @@ import {
 import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
+import crasLogo from "../assets/cras_logo.png";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -75,7 +76,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "CRAS — Conversion Rate Analytics System" },
       { name: "description", content: "AI-augmented conversion rate analytics for sales and BD teams." },
     ],
-    links: [{ rel: "stylesheet", href: appCss }],
+    links: [
+      { rel: "stylesheet", href: appCss },
+      { rel: "icon", type: "image/png", href: crasLogo },
+    ],
   }),
   shellComponent: RootShell,
   component: RootComponent,

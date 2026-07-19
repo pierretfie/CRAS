@@ -2,26 +2,70 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { query } from "@/lib/db";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PlusCircle, Search } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useDataScope } from "@/contexts/data-scope-context";
+import { DataScopeToggle } from "@/components/data-scope-toggle";
 
 export const Route = createFileRoute("/_authenticated/clients/")({
   component: ClientsList,
 });
 
 function ClientsList() {
+  const { effectiveUserId } = useDataScope();
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<"all" | "active" | "won" | "lost">("all");
 
   const { data, isLoading } = useQuery({
-    queryKey: ["clients"],
+    queryKey: ["clients", "v2", effectiveUserId],
     queryFn: async () => {
-      const res = await query('SELECT * FROM clients ORDER BY updated_at DESC');
+      if (!effectiveUserId) {
+        // "All Data" mode - fetch all clients
+        const sql = `SELECT c.*, p.name AS created_by_name, p.department AS created_by_dept
+           FROM clients c
+           LEFT JOIN profiles p ON p.id = c.created_by
+           ORDER BY c.updated_at DESC`;
+        const res = await query(sql, []);
+        if (res.error) throw res.error;
+        return res.data;
+      }
+      
+      // "Your Data" mode - find ALL clients the user is associated with
+      // Same logic as analytics: created, worked on, follow-ups, or activity logs
+      const clientIdsSql = `
+        SELECT DISTINCT client_id FROM (
+          SELECT id as client_id FROM clients WHERE created_by = $1
+          UNION
+          SELECT client_id FROM client_stage_events WHERE user_id = $1
+          UNION
+          SELECT client_id FROM client_follow_ups WHERE user_id = $1
+          UNION
+          SELECT client_id FROM follow_up_logs WHERE user_id = $1
+        ) AS user_clients
+      `;
+      
+      const clientIdsRes = await query(clientIdsSql, [effectiveUserId]);
+      if (clientIdsRes.error) throw clientIdsRes.error;
+      
+      const clientIds = ((clientIdsRes.data ?? []) as Array<{ client_id: string }>).map(row => row.client_id);
+      
+      if (clientIds.length === 0) {
+        return [];
+      }
+      
+      // Fetch full client data for these IDs
+      const sql = `SELECT c.*, p.name AS created_by_name, p.department AS created_by_dept
+         FROM clients c
+         LEFT JOIN profiles p ON p.id = c.created_by
+         WHERE c.id = ANY($1::uuid[])
+         ORDER BY c.updated_at DESC`;
+      
+      const res = await query(sql, [clientIds]);
       if (res.error) throw res.error;
       return res.data;
     },
@@ -40,9 +84,20 @@ function ClientsList() {
   });
 
   const [productFilter, setProductFilter] = useState("all");
+  const [repFilter, setRepFilter] = useState("all");
+
+  // Build unique rep list from loaded clients
+  const reps = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const c of (data ?? []) as any[]) {
+      if (c.created_by && c.created_by_name) seen.set(c.created_by, c.created_by_name);
+    }
+    return Array.from(seen.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [data]);
 
   const filtered = (data ?? []).filter((c: any) => {
     if (status !== "all" && c.status !== status) return false;
+    if (repFilter !== "all" && c.created_by !== repFilter) return false;
     if (productFilter !== "all") {
       if (productFilter === "__unspecified__") {
         if (c.product != null) return false;
@@ -52,7 +107,13 @@ function ClientsList() {
     }
     if (!q.trim()) return true;
     const t = q.toLowerCase();
-    return c.name.toLowerCase().includes(t) || c.category.toLowerCase().includes(t) || c.mode_of_connection.toLowerCase().includes(t) || (c.contact_person ?? "").toLowerCase().includes(t);
+    return (
+      c.name.toLowerCase().includes(t) ||
+      c.category.toLowerCase().includes(t) ||
+      c.mode_of_connection.toLowerCase().includes(t) ||
+      (c.contact_person ?? "").toLowerCase().includes(t) ||
+      (c.created_by_name ?? "").toLowerCase().includes(t)
+    );
   });
 
   return (
@@ -62,9 +123,12 @@ function ClientsList() {
           <h1 className="text-2xl font-bold tracking-tight">Clients</h1>
           <p className="text-sm text-muted-foreground">{data?.length ?? 0} total</p>
         </div>
-        <Button asChild>
-          <Link to="/clients/new"><PlusCircle className="h-4 w-4 mr-2" />New Client</Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          <DataScopeToggle />
+          <Button asChild>
+            <Link to="/clients/new"><PlusCircle className="h-4 w-4 mr-2" />New Client</Link>
+          </Button>
+        </div>
       </div>
 
       <div className="flex gap-2 flex-wrap">
@@ -91,6 +155,17 @@ function ClientsList() {
             ))}
           </SelectContent>
         </Select>
+        {reps.length > 1 && (
+          <Select value={repFilter} onValueChange={setRepFilter}>
+            <SelectTrigger className="w-[160px]"><SelectValue placeholder="All reps" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All reps</SelectItem>
+              {reps.map(r => (
+                <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {isLoading ? (
@@ -111,6 +186,12 @@ function ClientsList() {
                     <div className="text-xs text-muted-foreground truncate">
                       {c.category} · {c.mode_of_connection} {c.contact_person ? `· ${c.contact_person}` : ""}
                     </div>
+                    {c.created_by_name && (
+                      <div className="text-xs text-muted-foreground/70 truncate mt-0.5">
+                        Added by <span className="text-primary font-medium">{c.created_by_name}</span>
+                        {c.created_by_dept ? <span> · {c.created_by_dept}</span> : null}
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <Badge variant="outline" className={
@@ -120,7 +201,8 @@ function ClientsList() {
                       ""
                     }>Stage {c.current_stage}</Badge>
                     <Badge
-                      variant={c.status === "won" ? "default" : c.status === "lost" ? "destructive" : "secondary"}
+                      variant={c.status === "lost" ? "destructive" : "secondary"}
+                      className={c.status === "won" ? "bg-green-600 hover:bg-green-700 text-white" : ""}
                     >
                       {c.status}
                     </Badge>

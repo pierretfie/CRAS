@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { query } from "@/lib/db";
 import { useState } from "react";
@@ -10,19 +10,47 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
-import { Plus, Sparkles, Trash2 } from "lucide-react";
+import { InterestScaleSlider } from "@/components/interest-scale-slider";
+import { CsvImportDrawer } from "@/components/csv-import-drawer";
+import { Plus, Sparkles, Trash2, Bell, Upload } from "lucide-react";
+import { notifyNewClient } from "@/lib/notify";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { createFollowUp } from "@/lib/follow-ups";
 
 export const Route = createFileRoute("/_authenticated/clients/new")({
   component: NewClient,
 });
 
-const DEFAULT_MODES = ["Social Media", "Company Website", "Referral", "Direct Approach", "Email", "WhatsApp"];
+const DEFAULT_MODES = ["Social Media", "Company Website", "Website Form", "Referral", "Direct Approach", "Email", "WhatsApp"];
+
+const ACTIVITY_TYPES = [
+  // ── Voice ─────────────────────────────────────────────────────────────
+  { value: "call",           label: "📞 Phone Call" },
+  // ── Messaging ─────────────────────────────────────────────────────────
+  { value: "whatsapp",       label: "💬 WhatsApp Message" },
+  { value: "sms",            label: "📱 SMS" },
+  { value: "email",          label: "✉️ Email" },
+  { value: "linkedin_dm",    label: "💼 LinkedIn Message" },
+  { value: "ig_dm",          label: "📸 Instagram DM" },
+  { value: "facebook_dm",    label: "👥 Facebook DM" },
+  { value: "twitter_dm",     label: "🐦 X / Twitter DM" },
+  { value: "telegram",       label: "✈️ Telegram" },
+  // ── Face-to-face / video ───────────────────────────────────────────────
+  { value: "meeting",        label: "🤝 Physical Meeting" },
+  { value: "video_call",     label: "🎥 Video Call" },
+  // ── Events & structured ───────────────────────────────────────────────
+  { value: "conference",     label: "🎪 Conference / Event" },
+  { value: "demo",           label: "🖥️ Demo / Walkthrough" },
+  { value: "website_form",   label: "🌐 Website Form" },
+  { value: "referral_intro", label: "🔗 Referral Introduction" },
+];
 
 function NewClient() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
+  const [csvDrawerOpen, setCsvDrawerOpen] = useState(false);
 
   const { data: categories } = useQuery({
     queryKey: ["admin_categories"],
@@ -67,6 +95,10 @@ function NewClient() {
   const [normalizing, setNormalizing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [interestScale, setInterestScale] = useState(5);
+  const [followUpEnabled, setFollowUpEnabled] = useState(false);
+  const [followUpFrequency, setFollowUpFrequency] = useState("daily");
+  const [followUpNote, setFollowUpNote] = useState("");
+  const [directActivityType, setDirectActivityType] = useState("");
 
   function set<K extends keyof typeof form>(k: K, v: (typeof form)[K]) {
     setForm((f) => ({ ...f, [k]: v }));
@@ -79,6 +111,10 @@ function NewClient() {
     if (!cat) return toast.error("Category required");
     if (!mode) return toast.error("Mode of connection required");
     if (!form.stage_notes.trim()) return toast.error("Describe the current stage");
+    if (
+      (form.mode === "Direct Approach" || form.customMode.toLowerCase().includes("direct")) &&
+      !directActivityType
+    ) return toast.error("Pick how you reached out before continuing");
     const stageLabel = stages?.find((s: any) => s.stage_number === form.stage)?.label ?? "";
     setNormalizing(true);
     try {
@@ -89,6 +125,7 @@ function NewClient() {
           stage: form.stage,
           stageDescription: form.stage_notes,
           stageLabel,
+          interestScale,
         },
       });
       setPreview(result);
@@ -124,7 +161,7 @@ function NewClient() {
         current_stage: form.stage,
         stage_value: preview.stageValue,
         stage_label: preview.stageLabel ?? null,
-        stage_notes: form.stage_notes,
+        stage_notes: preview.normalizedDescription,
         custom_fields: cf,
         interest_scale: interestScale,
         created_by: u.user.id,
@@ -133,7 +170,44 @@ function NewClient() {
       if (error || !client) {
         toast.error(error?.message ?? "Failed to save client");
       } else {
-        toast.success("Client created");
+        // Insert initial stage event so the description appears in the timeline
+        await supabase.from("client_stage_events").insert({
+          client_id: client.id,
+          user_id: u.user.id,
+          from_stage: null,
+          to_stage: form.stage,
+          event_type: "progress",
+          description: preview.normalizedDescription,
+          lost_reason: null,
+          stage_value: preview.stageValue,
+          activity_type: directActivityType || null,
+          interest_scale: interestScale,
+        });
+
+        // Notify admins (fire-and-forget)
+        try {
+          const { data: profileData } = await supabase.from("profiles").select("name").eq("id", u.user.id).single();
+          const byName: string = (profileData as any)?.name ?? "Someone";
+          notifyNewClient(
+            client.id,
+            form.name.trim(),
+            byName,
+            form.customProduct.trim() || form.product || null,
+            form.stage
+          );
+        } catch { /* non-critical */ }
+
+        if (followUpEnabled) {
+          try {
+            await createFollowUp(client.id, u.user.id, followUpFrequency, followUpNote.trim() || null);
+            toast.success("Client created with follow-up scheduled");
+          } catch {
+            toast.success("Client created");
+            toast.error("Failed to schedule follow-up");
+          }
+        } else {
+          toast.success("Client created");
+        }
         navigate({ to: "/clients" });
       }
     } catch (err: unknown) {
@@ -146,10 +220,28 @@ function NewClient() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">New Client</h1>
-        <p className="text-sm text-muted-foreground">The AI will normalize and classify before saving.</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">New Client</h1>
+          <p className="text-sm text-muted-foreground">The AI will normalize and classify before saving.</p>
+        </div>
+        <Button
+          onClick={() => setCsvDrawerOpen(true)}
+          className="bg-violet-600 hover:bg-violet-700 text-white shadow-sm gap-2"
+        >
+          <Upload className="h-4 w-4" />
+          Import via CSV
+        </Button>
       </div>
+
+      <CsvImportDrawer
+        open={csvDrawerOpen}
+        onClose={() => setCsvDrawerOpen(false)}
+        onImported={() => {
+          qc.invalidateQueries({ queryKey: ["clients"] });
+          navigate({ to: "/clients" });
+        }}
+      />
 
       <Card>
         <CardHeader><CardTitle>Contact</CardTitle></CardHeader>
@@ -168,9 +260,10 @@ function NewClient() {
         <CardHeader><CardTitle>Classification</CardTitle><CardDescription>Pick from presets or add your own</CardDescription></CardHeader>
         <CardContent className="grid md:grid-cols-2 gap-4">
           <Field label="Product">
-            <Select value={form.product} onValueChange={(v) => set("product", v)}>
+            <Select value={form.product} onValueChange={(v) => set("product", v === "__clear__" ? "" : v)}>
               <SelectTrigger><SelectValue placeholder="Pick or type custom" /></SelectTrigger>
               <SelectContent>
+                {form.product && <SelectItem value="__clear__" className="text-muted-foreground italic">Clear selection</SelectItem>}
                 {products?.map((p) => <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -178,25 +271,14 @@ function NewClient() {
           </Field>
 
           <div className="space-y-2 md:col-span-2">
-            <Label>Interest Scale</Label>
-            <div className="flex items-center gap-4">
-              <Slider
-                min={1}
-                max={10}
-                step={0.1}
-                value={[interestScale]}
-                onValueChange={([v]) => setInterestScale(v)}
-                className="flex-1"
-              />
-              <span className="text-sm font-medium w-12 text-right">{interestScale.toFixed(1)}</span>
-            </div>
-            <p className="text-xs text-muted-foreground">1 = Low interest, 10 = Very high interest</p>
+            <InterestScaleSlider value={interestScale} onChange={setInterestScale} />
           </div>
 
           <Field label="Category">
-            <Select value={form.category} onValueChange={(v) => set("category", v)}>
+            <Select value={form.category} onValueChange={(v) => set("category", v === "__clear__" ? "" : v)}>
               <SelectTrigger><SelectValue placeholder="Pick or type custom" /></SelectTrigger>
               <SelectContent>
+                {form.category && <SelectItem value="__clear__" className="text-muted-foreground italic">Clear selection</SelectItem>}
                 {categories?.map((c: any) => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -204,14 +286,38 @@ function NewClient() {
           </Field>
 
           <Field label="Mode of Connection">
-            <Select value={form.mode} onValueChange={(v) => set("mode", v)}>
+            <Select value={form.mode} onValueChange={(v) => { set("mode", v === "__clear__" ? "" : v); setDirectActivityType(""); }}>
               <SelectTrigger><SelectValue placeholder="Pick or type custom" /></SelectTrigger>
               <SelectContent>
+                {form.mode && <SelectItem value="__clear__" className="text-muted-foreground italic">Clear selection</SelectItem>}
                 {DEFAULT_MODES.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
               </SelectContent>
             </Select>
             <Input className="mt-2" placeholder="Or type custom (fb, ig, …)" value={form.customMode} onChange={(e) => set("customMode", e.target.value)} />
           </Field>
+
+          {/* Activity type — shown when mode is Direct Approach */}
+          {(form.mode === "Direct Approach" || form.customMode.toLowerCase().includes("direct")) && (
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-sm font-medium">How did you reach out?</label>
+              <div className="flex flex-wrap gap-1.5">
+                {ACTIVITY_TYPES.map((t) => (
+                  <button
+                    key={t.value}
+                    type="button"
+                    onClick={() => setDirectActivityType(directActivityType === t.value ? "" : t.value)}
+                    className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${
+                      directActivityType === t.value
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "border-border text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <Field label="Stage">
             <Select value={String(form.stage)} onValueChange={(v) => set("stage", Number(v))}>
@@ -249,11 +355,54 @@ function NewClient() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bell className="h-4 w-4" /> Follow-up
+          </CardTitle>
+          <CardDescription>Schedule a reminder to follow up with this client</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <Label>Enable follow-up</Label>
+            <Switch checked={followUpEnabled} onCheckedChange={setFollowUpEnabled} />
+          </div>
+          {followUpEnabled && (
+            <>
+              <Field label="Frequency">
+                <Select value={followUpFrequency} onValueChange={setFollowUpFrequency}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="daily">Daily</SelectItem>
+                    <SelectItem value="every_2_days">Every 2 Days</SelectItem>
+                    <SelectItem value="weekly">Weekly</SelectItem>
+                    <SelectItem value="custom">Custom</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
+              <Field label="Note (optional)">
+                <Input
+                  placeholder="What to follow up about..."
+                  value={followUpNote}
+                  onChange={(e) => setFollowUpNote(e.target.value)}
+                />
+              </Field>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
       {!preview ? (
         <div className="flex justify-end">
-          <Button onClick={runAI} disabled={normalizing}>
-            {normalizing ? "Normalizing..." : <><Sparkles className="h-4 w-4 mr-2" />Normalize with AI</>}
-          </Button>
+          {(() => {
+            const isDirectApproach = form.mode === "Direct Approach" || form.customMode.toLowerCase().includes("direct");
+            const missingMethod = isDirectApproach && !directActivityType;
+            return (
+              <Button onClick={runAI} disabled={normalizing || missingMethod}>
+                {normalizing ? "Normalizing..." : missingMethod ? "Pick a method above" : <><Sparkles className="h-4 w-4 mr-2" />Normalize with AI</>}
+              </Button>
+            );
+          })()}
         </div>
       ) : (
         <Card className="border-primary/50">
@@ -266,6 +415,7 @@ function NewClient() {
             <Row k="Mode of Connection" v={preview.modeOfConnection} />
             <Row k="Stage" v={`${form.stage}${preview.stageLabel ? ` · ${preview.stageLabel}` : ""}`} />
             <Row k="Stage Value" v={<Badge variant={preview.stageValue ? "default" : "outline"}>{preview.stageValue} {preview.stageValue ? "(progress)" : "(preliminary)"}</Badge>} />
+            <Row k="Stage Notes" v={preview.normalizedDescription} />
             <p className="text-xs text-muted-foreground pt-2 italic">{preview.reasoning}</p>
             <div className="flex gap-2 pt-2">
               <Button variant="outline" onClick={() => setPreview(null)}>Edit</Button>

@@ -10,6 +10,7 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+dist-electron
 .output
 .vinxi
 .tanstack/**
@@ -19,6 +20,10 @@ dist-ssr
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars
+
+# Electron
+release/
+*.blockmap
 
 # Editor directories and files
 .vscode/*

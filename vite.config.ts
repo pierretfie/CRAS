@@ -6,6 +6,9 @@
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
+// Detect if building for Electron (set via ELECTRON_BUILD env var)
+const isElectron = process.env.ELECTRON_BUILD === "true";
+
 export default defineConfig({
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
@@ -14,5 +17,7 @@ export default defineConfig({
     serverFns: {
       disableCsrfMiddlewareWarning: true,
     },
+    // For Electron builds, use node-server preset instead of Cloudflare
+    ...(isElectron ? { nitro: { preset: "node-server" } } : {}),
   },
 });

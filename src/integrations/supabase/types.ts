@@ -14,41 +14,105 @@ export type Database = {
   }
   public: {
     Tables: {
+      companies: {
+        Row: {
+          id: string
+          name: string
+          slug: string
+          industry: string | null
+          website: string | null
+          phone: string | null
+          address: string | null
+          logo_url: string | null
+          active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          slug: string
+          industry?: string | null
+          website?: string | null
+          phone?: string | null
+          address?: string | null
+          logo_url?: string | null
+          active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          slug?: string
+          industry?: string | null
+          website?: string | null
+          phone?: string | null
+          address?: string | null
+          logo_url?: string | null
+          active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       admin_categories: {
         Row: {
           created_at: string
           id: string
           name: string
+          company_id: string
         }
         Insert: {
           created_at?: string
           id?: string
           name: string
+          company_id: string
         }
         Update: {
           created_at?: string
           id?: string
           name?: string
+          company_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "admin_categories_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       admin_products: {
         Row: {
           created_at: string
           id: string
           name: string
+          company_id: string
         }
         Insert: {
           created_at?: string
           id?: string
           name: string
+          company_id: string
         }
         Update: {
           created_at?: string
           id?: string
           name?: string
+          company_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "admin_products_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       client_interactions: {
         Row: {
@@ -75,6 +139,116 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "client_interactions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_access_requests: {
+        Row: {
+          id: string
+          client_id: string
+          requester_id: string
+          owner_id: string
+          message: string | null
+          status: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          client_id: string
+          requester_id: string
+          owner_id: string
+          message?: string | null
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      notifications: {
+        Row: {
+          id: string
+          user_id: string
+          company_id: string
+          type: string
+          title: string
+          body: string
+          client_id: string | null
+          payload: Record<string, unknown>
+          read: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          company_id: string
+          type: string
+          title: string
+          body: string
+          client_id?: string | null
+          payload?: Record<string, unknown>
+          read?: boolean
+          created_at?: string
+        }
+        Update: {
+          read?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      follow_up_logs: {
+        Row: {
+          activity_type: string | null
+          id: string
+          follow_up_id: string
+          client_id: string
+          user_id: string
+          note: string | null
+          logged_at: string
+        }
+        Insert: {
+          activity_type?: string | null
+          id?: string
+          follow_up_id: string
+          client_id: string
+          user_id: string
+          note?: string | null
+          logged_at?: string
+        }
+        Update: {
+          activity_type?: string | null
+          id?: string
+          follow_up_id?: string
+          client_id?: string
+          user_id?: string
+          note?: string | null
+          logged_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "follow_up_logs_follow_up_id_fkey"
+            columns: ["follow_up_id"]
+            isOneToOne: false
+            referencedRelation: "client_follow_ups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "follow_up_logs_client_id_fkey"
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
@@ -131,6 +305,7 @@ export type Database = {
       }
       client_stage_events: {
         Row: {
+          activity_type: string | null
           client_id: string
           created_at: string
           description: string
@@ -143,6 +318,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          activity_type?: string | null
           client_id: string
           created_at?: string
           description: string
@@ -155,6 +331,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          activity_type?: string | null
           client_id?: string
           created_at?: string
           description?: string
@@ -179,6 +356,7 @@ export type Database = {
       clients: {
         Row: {
           category: string
+          company_id: string
           contact_person: string | null
           contact_person_email: string | null
           contact_person_phone: string | null
@@ -203,6 +381,7 @@ export type Database = {
         }
         Insert: {
           category: string
+          company_id: string
           contact_person?: string | null
           contact_person_email?: string | null
           contact_person_phone?: string | null
@@ -227,6 +406,7 @@ export type Database = {
         }
         Update: {
           category?: string
+          company_id?: string
           contact_person?: string | null
           contact_person_email?: string | null
           contact_person_phone?: string | null
@@ -249,10 +429,19 @@ export type Database = {
           status?: Database["public"]["Enums"]["client_status"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "clients_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       conversion_stage_config: {
         Row: {
+          company_id: string
           created_at: string
           description: string | null
           id: string
@@ -261,6 +450,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          company_id: string
           created_at?: string
           description?: string | null
           id?: string
@@ -269,6 +459,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          company_id?: string
           created_at?: string
           description?: string | null
           id?: string
@@ -276,11 +467,20 @@ export type Database = {
           stage_number?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "conversion_stage_config_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
           active: boolean
+          company_id: string
           created_at: string
           department: string | null
           email: string
@@ -291,6 +491,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          company_id: string
           created_at?: string
           department?: string | null
           email: string
@@ -301,6 +502,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          company_id?: string
           created_at?: string
           department?: string | null
           email?: string
@@ -309,28 +511,47 @@ export type Database = {
           name?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
+          company_id: string | null
           created_at: string
           id: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Insert: {
+          company_id?: string | null
           created_at?: string
           id?: string
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }
         Update: {
+          company_id?: string | null
           created_at?: string
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -344,9 +565,21 @@ export type Database = {
         }
         Returns: boolean
       }
+      my_company_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      is_company_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      is_super_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
     }
     Enums: {
-      app_role: "admin" | "user"
+      app_role: "admin" | "user" | "super_admin"
       client_status: "active" | "won" | "lost"
       stage_event_type: "progress" | "regress" | "note" | "won" | "lost"
     }
@@ -476,7 +709,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user"],
+      app_role: ["admin", "user", "super_admin"],
       client_status: ["active", "won", "lost"],
       stage_event_type: ["progress", "regress", "note", "won", "lost"],
     },

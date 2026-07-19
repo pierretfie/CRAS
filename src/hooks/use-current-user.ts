@@ -15,7 +15,18 @@ export function useCurrentUser() {
       const profile = (profileData as any[])?.length > 0 ? (profileData as any[])[0] : null;
       const roles = (rolesData ?? []) as { role: string }[];
       const isAdmin = roles.some((r) => r.role === "admin");
-      return { user: data.user, profile, isAdmin };
+
+      // Fetch company details if the user has a company_id
+      let company: { id: string; name: string; slug: string; industry?: string; website?: string; phone?: string; address?: string } | null = null;
+      if (profile?.company_id) {
+        const { data: companyData } = await query(
+          'SELECT * FROM companies WHERE id = $1',
+          [profile.company_id]
+        );
+        company = (companyData as any[])?.length > 0 ? (companyData as any[])[0] : null;
+      }
+
+      return { user: data.user, profile, isAdmin, company };
     },
   });
 }
