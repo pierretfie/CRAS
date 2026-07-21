@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Update</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #1a1a2e;
+    color: #e0e0e0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    overflow: hidden;
+    user-select: none;
+    -webkit-app-region: drag;
+  }
+  .dialog {
+    width: 420px;
+    padding: 32px 28px 24px;
+    background: #16213e;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03);
+  }
+  .icon {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 16px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .icon svg { width: 26px; height: 26px; fill: white; }
+  .title {
+    text-align: center;
+    font-size: 13px;
+    font-weight: 500;
+    color: #8892b0;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    margin-bottom: 6px;
+  }
+  .version {
+    text-align: center;
+    font-size: 20px;
+    font-weight: 600;
+    color: #ccd6f6;
+    margin-bottom: 8px;
+  }
+  .description {
+    text-align: center;
+    font-size: 14px;
+    color: #8892b0;
+    line-height: 1.6;
+    margin-bottom: 24px;
+  }
+  .progress-container {
+    margin-bottom: 24px;
+    display: none;
+  }
+  .progress-container.active { display: block; }
+  .progress-info {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: #8892b0;
+  }
+  .progress-bar {
+    width: 100%;
+    height: 6px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+  }
+  .buttons {
+    display: flex;
+    gap: 10px;
+  }
+  .btn {
+    flex: 1;
+    padding: 12px 16px;
+    border-radius: 10px;
+    border: none;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    -webkit-app-region: no-drag;
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+  .btn-secondary {
+    background: rgba(255,255,255,0.06);
+    color: #ccd6f6;
+  }
+  .btn-secondary:hover { background: rgba(255,255,255,0.1); }
+  .btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+  }
+  .btn-primary:hover { filter: brightness(1.1); }
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    filter: none;
+  }
+</style>
+</head>
+<body>
+<div class="dialog">
+  <div class="icon">
+    <svg viewBox="0 0 24 24"><path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3zm-1 14.5v-2h2v2h-2zm0-4V7h2v5.5h-2z"/></svg>
+  </div>
+  <div class="title">Update Available</div>
+  <div class="version" id="version"></div>
+  <div class="description" id="description">A new version of CRAS is ready to install.</div>
+
+  <div class="progress-container" id="progress">
+    <div class="progress-info">
+      <span id="progress-text">Downloading...</span>
+      <span id="progress-percent">0%</span>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progress-fill"></div>
+    </div>
+  </div>
+
+  <div class="buttons">
+    <button class="btn btn-secondary" id="btn-later">Later</button>
+    <button class="btn btn-primary" id="btn-restart" disabled>Restart &amp; Install</button>
+  </div>
+</div>
+<script>
+  const versionEl = document.getElementById('version');
+  const descEl = document.getElementById('description');
+  const progressEl = document.getElementById('progress');
+  const progressPercent = document.getElementById('progress-percent');
+  const progressText = document.getElementById('progress-text');
+  const progressFill = document.getElementById('progress-fill');
+  const btnRestart = document.getElementById('btn-restart');
+  const btnLater = document.getElementById('btn-later');
+
+  window.electronAPI.onUpdateInfo((data) => {
+    versionEl.textContent = 'v' + data.version;
+    if (data.status === 'downloaded') {
+      descEl.textContent = 'Update downloaded and ready to install.';
+      progressEl.classList.remove('active');
+      btnRestart.disabled = false;
+      btnLater.style.display = 'none';
+    }
+  });
+
+  window.electronAPI.onUpdateProgress((data) => {
+    progressEl.classList.add('active');
+    progressFill.style.width = data.percent + '%';
+    progressPercent.textContent = data.percent + '%';
+    if (data.percent < 100) {
+      progressText.textContent = 'Downloading...';
+    }
+  });
+
+  btnRestart.addEventListener('click', () => window.electronAPI.updateRestart());
+  btnLater.addEventListener('click', () => window.electronAPI.updateLater());
+</script>
+</body>
+</html>

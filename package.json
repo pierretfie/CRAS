@@ -21,7 +21,7 @@
     "electron:build:win": "npm run build:electron && electron-builder --win",
     "electron:build:all": "npm run build:electron && electron-builder --linux --win",
     "build:electron": "NODE_ENV=production ELECTRON_BUILD=true vite build && npm run build:electron-main && npm run bundle:server",
-    "build:electron-main": "tsc -p electron/tsconfig.json",
+    "build:electron-main": "tsc -p electron/tsconfig.json && cp electron/update-dialog.html dist-electron/update-dialog.html",
     "bundle:server": "node scripts/bundle-server.mjs"
   },
   "dependencies": {

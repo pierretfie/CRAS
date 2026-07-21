@@ -1,82 +1,103 @@
 import electronUpdater from "electron-updater";
-import { BrowserWindow, dialog } from "electron";
-import log from "electron-log";
+import { BrowserWindow, ipcMain } from "electron";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { dirname } from "node:path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const { autoUpdater } = electronUpdater;
 
-// Configure logging for auto-updater
-autoUpdater.logger = log;
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = false;
 
-/**
- * Initialize auto-update checking.
- * Call this once after the main window is created.
- */
+let updateDialog: BrowserWindow | null = null;
+let updateVersion = "";
+
+function createUpdateDialog(): BrowserWindow {
+  if (updateDialog && !updateDialog.isDestroyed()) {
+    updateDialog.focus();
+    return updateDialog;
+  }
+
+  updateDialog = new BrowserWindow({
+    width: 460,
+    height: 320,
+    resizable: false,
+    frame: false,
+    transparent: false,
+    modal: true,
+    skipTaskbar: true,
+    center: true,
+    backgroundColor: "#1a1a2e",
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+
+  updateDialog.loadFile(path.join(__dirname, "update-dialog.html"));
+  updateDialog.on("closed", () => { updateDialog = null; });
+
+  return updateDialog;
+}
+
+function sendToDialog(channel: string, ...args: unknown[]) {
+  if (updateDialog && !updateDialog.isDestroyed()) {
+    updateDialog.webContents.send(channel, ...args);
+  }
+}
+
+ipcMain.on("update:later", () => {
+  updateDialog?.close();
+});
+
+ipcMain.on("update:restart", () => {
+  autoUpdater.quitAndInstall(false, true);
+});
+
 export function initAutoUpdate(mainWindow: BrowserWindow): void {
-  // Check for updates on startup (after a short delay so the app loads first)
   setTimeout(() => {
     autoUpdater.checkForUpdates().catch(() => {});
   }, 10_000);
 
-  // Check for updates every 4 hours
   setInterval(() => {
     autoUpdater.checkForUpdates().catch(() => {});
   }, 4 * 60 * 60 * 1000);
 
-  autoUpdater.on("checking-for-update", () => {
-    console.log("[AutoUpdate] Checking for updates...");
-  });
-
   autoUpdater.on("update-available", (info) => {
-    console.log(`[AutoUpdate] Update available: ${info.version}`);
-    dialog.showMessageBox(mainWindow, {
-      type: "info",
-      title: "Update Available",
-      message: `A new version (${info.version}) is available.`,
-      detail: "It will be downloaded in the background. You'll be prompted to install when it's ready.",
-      buttons: ["OK"],
+    updateVersion = info.version;
+    const dialog = createUpdateDialog();
+    dialog.webContents.on("did-finish-load", () => {
+      dialog.webContents.send("update:info", {
+        version: info.version,
+        status: "available",
+      });
     });
-  });
 
-  autoUpdater.on("update-not-available", () => {
-    console.log("[AutoUpdate] App is up to date");
+    autoUpdater.downloadUpdate().catch(() => {});
   });
 
   autoUpdater.on("download-progress", (progress) => {
-    console.log(`[AutoUpdate] Download progress: ${Math.round(progress.percent)}%`);
-    mainWindow.setProgressBar(progress.percent / 100);
+    sendToDialog("update:progress", {
+      percent: Math.round(progress.percent),
+      transferred: progress.transferred,
+      total: progress.total,
+    });
   });
 
-  autoUpdater.on("update-downloaded", (info) => {
-    console.log(`[AutoUpdate] Update downloaded: ${info.version}`);
-    mainWindow.setProgressBar(-1);
-
-    dialog
-      .showMessageBox(mainWindow, {
-        type: "info",
-        title: "Update Ready",
-        message: "A new version has been downloaded.",
-        detail: "Would you like to restart and install the update now?",
-        buttons: ["Restart Now", "Later"],
-        defaultId: 0,
-        cancelId: 1,
-      })
-      .then(({ response }) => {
-        if (response === 0) {
-          autoUpdater.quitAndInstall(false, true);
-        }
-      });
+  autoUpdater.on("update-downloaded", () => {
+    sendToDialog("update:info", {
+      version: updateVersion,
+      status: "downloaded",
+    });
   });
 
-  autoUpdater.on("error", (err) => {
-    console.error("[AutoUpdate] Error:", err);
-  });
+  autoUpdater.on("error", () => {});
 }
 
-/**
- * Manually check for updates (e.g., from a menu item).
- */
 export function checkForUpdates(): void {
-  autoUpdater.checkForUpdatesAndNotify().catch((err) => {
-    console.error("[AutoUpdate] Manual check failed:", err);
-  });
+  autoUpdater.checkForUpdates().catch(() => {});
 }
