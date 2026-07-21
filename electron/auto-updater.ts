@@ -14,16 +14,12 @@ autoUpdater.logger = log;
 export function initAutoUpdate(mainWindow: BrowserWindow): void {
   // Check for updates on startup (after a short delay so the app loads first)
   setTimeout(() => {
-    autoUpdater.checkForUpdatesAndNotify().catch((err) => {
-      console.error("[AutoUpdate] Failed to check for updates:", err);
-    });
+    autoUpdater.checkForUpdates().catch(() => {});
   }, 10_000);
 
   // Check for updates every 4 hours
   setInterval(() => {
-    autoUpdater.checkForUpdatesAndNotify().catch((err) => {
-      console.error("[AutoUpdate] Failed to check for updates:", err);
-    });
+    autoUpdater.checkForUpdates().catch(() => {});
   }, 4 * 60 * 60 * 1000);
 
   autoUpdater.on("checking-for-update", () => {
