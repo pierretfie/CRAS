@@ -101,16 +101,11 @@ async function startServer(): Promise<number> {
     await waitForServer(`http://127.0.0.1:${port}`);
     console.log(`[Electron] Dev server ready on port ${port}`);
   } else {
-    // Production: find the built server
-    const possiblePaths = [
-      path.join(process.resourcesPath, "dist", "server", "server.mjs"),
-      path.join(process.resourcesPath, "dist", "server", "server.js"),
-      path.join(process.resourcesPath, "dist", "server.js"),
-    ];
+    // Production: run the bundled server
+    const serverPath = path.join(process.resourcesPath, "server", "entry.mjs");
 
-    const serverPath = possiblePaths.find((p) => fs.existsSync(p));
-    if (!serverPath) {
-      throw new Error(`Server not found. Tried: ${possiblePaths.join(", ")}`);
+    if (!fs.existsSync(serverPath)) {
+      throw new Error(`Server not found at ${serverPath}`);
     }
 
     console.log(`[Electron] Starting production server from ${serverPath}...`);
@@ -131,24 +126,50 @@ async function startServer(): Promise<number> {
       }
     }
 
-    serverProcess = spawn(process.execPath, [serverPath], {
+    // Detect system node for running the server (avoids Electron's FD_SETSIZE limit)
+    const nodeBinary = process.platform === "win32" ? "node.exe" : "node";
+    console.log(`[Electron] Using system node: ${nodeBinary}`);
+    console.log(`[Electron] Starting production server from ${serverPath}...`);
+
+    serverProcess = spawn(nodeBinary, [serverPath], {
+      detached: true,
       cwd: path.join(process.resourcesPath),
       env: {
-        ...process.env,
         ...envOverrides,
         PORT: String(port),
         HOST: "127.0.0.1",
         NODE_ENV: "production",
+        PATH: process.env.PATH,
       },
-      stdio: "inherit",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    serverProcess.stdout?.on("data", (data) => {
+      console.log("[Server]", data.toString().trim());
+    });
+
+    serverProcess.stderr?.on("data", (data) => {
+      console.error("[Server]", data.toString().trim());
+    });
+
+    serverProcess.on("error", (err) => {
+      console.error("[Electron] Failed to start production server:", err.message);
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+        console.error("[Electron] Node.js is not installed. Please install Node.js to run CRAS.");
+      }
+    });
+
+    serverProcess.on("exit", (code, signal) => {
+      console.log(`[Electron] Production server exited with code ${code} signal ${signal}`);
+      serverProcess = null;
     });
 
     serverProcess.on("error", (err) => {
       console.error("[Electron] Failed to start production server:", err);
     });
 
-    serverProcess.on("exit", (code) => {
-      console.log(`[Electron] Production server exited with code ${code}`);
+    serverProcess.on("exit", (code, signal) => {
+      console.log(`[Electron] Production server exited with code ${code} signal ${signal}`);
       serverProcess = null;
     });
 
@@ -163,11 +184,20 @@ async function startServer(): Promise<number> {
 function stopServer(): void {
   if (serverProcess) {
     console.log("[Electron] Stopping server...");
-    serverProcess.kill("SIGTERM");
+    // Kill the entire process group since we used detached: true
+    try {
+      process.kill(-serverProcess.pid!, "SIGTERM");
+    } catch {
+      serverProcess.kill("SIGTERM");
+    }
 
     setTimeout(() => {
       if (serverProcess) {
-        serverProcess.kill("SIGKILL");
+        try {
+          process.kill(-serverProcess.pid!, "SIGKILL");
+        } catch {
+          serverProcess.kill("SIGKILL");
+        }
         serverProcess = null;
       }
     }, 5000);
@@ -185,29 +215,28 @@ async function createWindow(): Promise<void> {
   serverPort = await startServer();
 
   // Create the browser window
+  const iconPath = isDev
+    ? path.join(__dirname, "..", "src", "assets", "cras_logo.png")
+    : path.join(process.resourcesPath, "icon.png");
+
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 1024,
     minHeight: 700,
     title: "CRAS - Conversion Rate Analytics System",
-    icon: path.join(__dirname, "..", "src", "assets", "cras_logo.png"),
+    icon: fs.existsSync(iconPath) ? iconPath : undefined,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
     },
-    titleBarStyle: "hiddenInset",
-    show: false,
+    show: true,
   });
 
   const url = `http://127.0.0.1:${serverPort}`;
   await mainWindow.loadURL(url);
-
-  mainWindow.once("ready-to-show", () => {
-    mainWindow?.show();
-  });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);

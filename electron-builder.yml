@@ -9,20 +9,25 @@ directories:
 files:
   - dist-electron/**/*.js
   - dist/client/**/*
-  - dist/server/**/*
   - package.json
-  - node_modules/**/*
-  - src/assets/**
 
 extraResources:
   - from: .env
     to: .env
+  - from: release/server-single
+    to: server
+  - from: release/public
+    to: public
+
+asar: true
 
 linux:
   target:
     - deb
     - AppImage
   category: Office
+  syncDesktopName: true
+  artifactName: "${productName}-${version}_${arch}.${ext}"
 
 win:
   target:
@@ -39,5 +44,5 @@ nsis:
 publish:
   provider: github
   owner: pierretfie
-  repo: cras
+  repo: CRAS
   releaseType: release

@@ -2,9 +2,11 @@
   "name": "cras",
   "version": "1.0.0",
   "description": "CRAS - Conversion Rate Analytics System",
+  "author": "CRAS Team <dev@cras.app>",
   "main": "dist-electron/main.js",
   "private": true,
   "sideEffects": false,
+  "desktopName": "com.cras.analytics",
   "type": "module",
   "scripts": {
     "dev": "vite dev",
@@ -18,8 +20,9 @@
     "electron:build:linux": "npm run build:electron && electron-builder --linux",
     "electron:build:win": "npm run build:electron && electron-builder --win",
     "electron:build:all": "npm run build:electron && electron-builder --linux --win",
-    "build:electron": "ELECTRON_BUILD=true vite build && npm run build:electron-main",
-    "build:electron-main": "tsc -p electron/tsconfig.json"
+    "build:electron": "NODE_ENV=production ELECTRON_BUILD=true vite build && npm run build:electron-main && npm run bundle:server",
+    "build:electron-main": "tsc -p electron/tsconfig.json",
+    "bundle:server": "node scripts/bundle-server.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -59,6 +62,8 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
+    "electron-log": "^5.4.4",
+    "electron-updater": "^6.8.9",
     "embla-carousel-react": "^8.6.0",
     "input-otp": "^1.4.2",
     "jspdf": "^4.2.1",
@@ -90,8 +95,7 @@
     "concurrently": "^10.0.3",
     "electron": "^43.1.1",
     "electron-builder": "^26.15.3",
-    "electron-log": "^5.4.4",
-    "electron-updater": "^6.8.9",
+    "esbuild": "^0.28.1",
     "eslint": "^9.32.0",
     "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-prettier": "^5.2.6",
