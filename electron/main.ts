@@ -1,8 +1,7 @@
-import { app, BrowserWindow, ipcMain, shell, Menu, utilityProcess } from "electron";
+import { app, BrowserWindow, ipcMain, shell, Menu } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawn, type ChildProcess } from "node:child_process";
-import type { UtilityProcess } from "electron";
+import { spawn, fork, type ChildProcess } from "node:child_process";
 import net from "node:net";
 import fs from "node:fs";
 import { initAutoUpdate } from "./auto-updater.js";
@@ -27,7 +26,7 @@ if (!gotTheLock) {
 
 // ─── Global state ─────────────────────────────────────────────────────────────
 let mainWindow: BrowserWindow | null = null;
-let serverProcess: ChildProcess | UtilityProcess | null = null;
+let serverProcess: ChildProcess | null = null;
 let serverPort = 0;
 const isDev = !app.isPackaged;
 
@@ -138,8 +137,9 @@ async function startServer(): Promise<number> {
       const onExit = () => resolve(0);
 
       if (process.platform === "win32") {
-        // Windows: use Electron's bundled Node.js (no FD_SETSIZE issue on Windows)
-        const proc = utilityProcess.fork(serverPath, [], {
+        // Windows: use child_process.fork() which uses Electron's bundled Node.js
+        // (no FD_SETSIZE issue on Windows, safe to use Electron's Node.js)
+        const proc = fork(serverPath, [], {
           cwd: path.join(process.resourcesPath),
           env: {
             ...envOverrides,
@@ -147,17 +147,27 @@ async function startServer(): Promise<number> {
             HOST: "127.0.0.1",
             NODE_ENV: "production",
           },
+          stdio: ["ignore", "pipe", "pipe", "ipc"],
         });
-      proc.on("spawn", () => console.log("[Server] Process spawned"));
-      proc.on("message", (msg) => {
-        console.log("[Server]", JSON.stringify(msg));
-        if (msg && msg.type === "port" && typeof msg.port === "number") {
-          onOutput(`PORT:${msg.port}`);
-        }
-      });
+        proc.stdout?.on("data", (data) => {
+          const str = data.toString();
+          console.log("[Server]", str.trim());
+          onOutput(str);
+        });
+        proc.stderr?.on("data", (data) => console.error("[Server]", data.toString().trim()));
+        proc.on("message", (msg: Record<string, unknown>) => {
+          if (msg && msg.type === "port" && typeof msg.port === "number") {
+            onOutput(`PORT:${msg.port}`);
+          }
+        });
+        proc.on("error", (err) => console.error("[Electron] Server error:", err.message));
+        proc.on("exit", (code, signal) => {
+          console.log(`[Electron] Server exited code=${code} signal=${signal}`);
+          serverProcess = null;
+        });
         serverProcess = proc;
-        // Fallback: if no PORT: message arrives, use waitForServer
-        setTimeout(() => onExit(), 500);
+        // Fallback: if no PORT message arrives, use waitForServer
+        setTimeout(() => onExit(), 2000);
       } else {
         // Linux/Mac: use system node (avoids Electron's FD_SETSIZE limit)
         console.log("[Electron] Using system node: node");
