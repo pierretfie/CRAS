@@ -10,4 +10,6 @@ npm run build:electron && npx electron-builder --linux --win
 # 4. Push code + tag
 git push --tags
 
+ gh release create v1.0.2 release/CRAS-1.0.2_amd64.deb release/CRAS-1.0.2_x86_64.AppImage release/'CRAS Setup 1.0.2.exe' release/latest-linux.yml
+ 
 gh release upload v1.0.1 release/CRAS-1.0.1_amd64.deb release/CRAS-1.0.1_x86_64.AppImage  release/latest-linux.yml

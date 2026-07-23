@@ -1,7 +1,8 @@
-import { app, BrowserWindow, ipcMain, shell } from "electron";
+import { app, BrowserWindow, ipcMain, shell, Menu, utilityProcess } from "electron";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawn, type ChildProcess } from "node:child_process";
+import type { UtilityProcess } from "electron";
 import net from "node:net";
 import fs from "node:fs";
 import { initAutoUpdate } from "./auto-updater.js";
@@ -26,7 +27,7 @@ if (!gotTheLock) {
 
 // ─── Global state ─────────────────────────────────────────────────────────────
 let mainWindow: BrowserWindow | null = null;
-let serverProcess: ChildProcess | null = null;
+let serverProcess: ChildProcess | UtilityProcess | null = null;
 let serverPort = 0;
 const isDev = !app.isPackaged;
 
@@ -126,52 +127,46 @@ async function startServer(): Promise<number> {
       }
     }
 
-    // Detect system node for running the server (avoids Electron's FD_SETSIZE limit)
-    const nodeBinary = process.platform === "win32" ? "node.exe" : "node";
-    console.log(`[Electron] Using system node: ${nodeBinary}`);
     console.log(`[Electron] Starting production server from ${serverPath}...`);
 
-    serverProcess = spawn(nodeBinary, [serverPath], {
-      detached: true,
-      cwd: path.join(process.resourcesPath),
-      env: {
-        ...envOverrides,
-        PORT: String(port),
-        HOST: "127.0.0.1",
-        NODE_ENV: "production",
-        PATH: process.env.PATH,
-      },
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-
-    serverProcess.stdout?.on("data", (data) => {
-      console.log("[Server]", data.toString().trim());
-    });
-
-    serverProcess.stderr?.on("data", (data) => {
-      console.error("[Server]", data.toString().trim());
-    });
-
-    serverProcess.on("error", (err) => {
-      console.error("[Electron] Failed to start production server:", err.message);
-      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-        console.error("[Electron] Node.js is not installed. Please install Node.js to run CRAS.");
-      }
-    });
-
-    serverProcess.on("exit", (code, signal) => {
-      console.log(`[Electron] Production server exited with code ${code} signal ${signal}`);
-      serverProcess = null;
-    });
-
-    serverProcess.on("error", (err) => {
-      console.error("[Electron] Failed to start production server:", err);
-    });
-
-    serverProcess.on("exit", (code, signal) => {
-      console.log(`[Electron] Production server exited with code ${code} signal ${signal}`);
-      serverProcess = null;
-    });
+    if (process.platform === "win32") {
+      // Windows: use Electron's bundled Node.js (no FD_SETSIZE issue on Windows)
+      const proc = utilityProcess.fork(serverPath, [], {
+        cwd: path.join(process.resourcesPath),
+        env: {
+          ...envOverrides,
+          PORT: String(port),
+          HOST: "127.0.0.1",
+          NODE_ENV: "production",
+        },
+      });
+      proc.on("spawn", () => console.log("[Server] Process spawned"));
+      proc.on("message", (msg) => console.log("[Server]", msg));
+      serverProcess = proc;
+    } else {
+      // Linux/Mac: use system node (avoids Electron's FD_SETSIZE limit)
+      console.log("[Electron] Using system node: node");
+      const proc = spawn("node", [serverPath], {
+        detached: true,
+        cwd: path.join(process.resourcesPath),
+        env: {
+          ...envOverrides,
+          PORT: String(port),
+          HOST: "127.0.0.1",
+          NODE_ENV: "production",
+          PATH: process.env.PATH,
+        },
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      proc.stdout?.on("data", (data) => console.log("[Server]", data.toString().trim()));
+      proc.stderr?.on("data", (data) => console.error("[Server]", data.toString().trim()));
+      proc.on("error", (err) => console.error("[Electron] Server error:", err.message));
+      proc.on("exit", (code, signal) => {
+        console.log(`[Electron] Server exited code=${code} signal=${signal}`);
+        serverProcess = null;
+      });
+      serverProcess = proc;
+    }
 
     await waitForServer(`http://127.0.0.1:${port}`);
     console.log(`[Electron] Production server ready on port ${port}`);
@@ -184,18 +179,25 @@ async function startServer(): Promise<number> {
 function stopServer(): void {
   if (serverProcess) {
     console.log("[Electron] Stopping server...");
-    // Kill the entire process group since we used detached: true
-    try {
-      process.kill(-serverProcess.pid!, "SIGTERM");
-    } catch {
+    if (process.platform !== "win32") {
+      try {
+        process.kill(-serverProcess.pid!, "SIGTERM");
+      } catch {
+        serverProcess.kill("SIGTERM");
+      }
+    } else {
       serverProcess.kill("SIGTERM");
     }
 
     setTimeout(() => {
       if (serverProcess) {
-        try {
-          process.kill(-serverProcess.pid!, "SIGKILL");
-        } catch {
+        if (process.platform !== "win32") {
+          try {
+            process.kill(-serverProcess.pid!, "SIGKILL");
+          } catch {
+            serverProcess.kill("SIGKILL");
+          }
+        } else {
           serverProcess.kill("SIGKILL");
         }
         serverProcess = null;
