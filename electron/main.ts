@@ -127,52 +127,80 @@ async function startServer(): Promise<number> {
       }
     }
 
-    console.log(`[Electron] Starting production server from ${serverPath}...`);
+    // Use port 0 so the OS picks a free port — avoids race conditions
+    const actualPortPromise = new Promise<number>((resolve) => {
+      const onOutput = (data: string) => {
+        const match = data.match(/PORT:(\d+)/);
+        if (match) {
+          resolve(parseInt(match[1], 10));
+        }
+      };
+      const onExit = () => resolve(0);
 
-    if (process.platform === "win32") {
-      // Windows: use Electron's bundled Node.js (no FD_SETSIZE issue on Windows)
-      const proc = utilityProcess.fork(serverPath, [], {
-        cwd: path.join(process.resourcesPath),
-        env: {
-          ...envOverrides,
-          PORT: String(port),
-          HOST: "127.0.0.1",
-          NODE_ENV: "production",
-        },
-      });
+      if (process.platform === "win32") {
+        // Windows: use Electron's bundled Node.js (no FD_SETSIZE issue on Windows)
+        const proc = utilityProcess.fork(serverPath, [], {
+          cwd: path.join(process.resourcesPath),
+          env: {
+            ...envOverrides,
+            PORT: "0",
+            HOST: "127.0.0.1",
+            NODE_ENV: "production",
+          },
+        });
       proc.on("spawn", () => console.log("[Server] Process spawned"));
-      proc.on("message", (msg) => console.log("[Server]", msg));
-      serverProcess = proc;
-    } else {
-      // Linux/Mac: use system node (avoids Electron's FD_SETSIZE limit)
-      console.log("[Electron] Using system node: node");
-      const proc = spawn("node", [serverPath], {
-        detached: true,
-        cwd: path.join(process.resourcesPath),
-        env: {
-          ...envOverrides,
-          PORT: String(port),
-          HOST: "127.0.0.1",
-          NODE_ENV: "production",
-          PATH: process.env.PATH,
-        },
-        stdio: ["ignore", "pipe", "pipe"],
+      proc.on("message", (msg) => {
+        console.log("[Server]", JSON.stringify(msg));
+        if (msg && msg.type === "port" && typeof msg.port === "number") {
+          onOutput(`PORT:${msg.port}`);
+        }
       });
-      proc.stdout?.on("data", (data) => console.log("[Server]", data.toString().trim()));
-      proc.stderr?.on("data", (data) => console.error("[Server]", data.toString().trim()));
-      proc.on("error", (err) => console.error("[Electron] Server error:", err.message));
-      proc.on("exit", (code, signal) => {
-        console.log(`[Electron] Server exited code=${code} signal=${signal}`);
-        serverProcess = null;
-      });
-      serverProcess = proc;
-    }
+        serverProcess = proc;
+        // Fallback: if no PORT: message arrives, use waitForServer
+        setTimeout(() => onExit(), 500);
+      } else {
+        // Linux/Mac: use system node (avoids Electron's FD_SETSIZE limit)
+        console.log("[Electron] Using system node: node");
+        const proc = spawn("node", [serverPath], {
+          detached: true,
+          cwd: path.join(process.resourcesPath),
+          env: {
+            ...envOverrides,
+            PORT: "0",
+            HOST: "127.0.0.1",
+            NODE_ENV: "production",
+            PATH: process.env.PATH,
+          },
+          stdio: ["ignore", "pipe", "pipe"],
+        });
+        proc.stdout?.on("data", (data) => {
+          const str = data.toString();
+          console.log("[Server]", str.trim());
+          onOutput(str);
+        });
+        proc.stderr?.on("data", (data) => console.error("[Server]", data.toString().trim()));
+        proc.on("error", (err) => console.error("[Electron] Server error:", err.message));
+        proc.on("exit", (code, signal) => {
+          console.log(`[Electron] Server exited code=${code} signal=${signal}`);
+          serverProcess = null;
+        });
+        serverProcess = proc;
+        // Fallback: if no PORT: message arrives, use waitForServer
+        setTimeout(() => onExit(), 2000);
+      }
+    });
 
-    await waitForServer(`http://127.0.0.1:${port}`);
-    console.log(`[Electron] Production server ready on port ${port}`);
+    // Wait for server to report its port (or timeout)
+    serverPort = await actualPortPromise;
+    if (serverPort === 0) {
+      console.log("[Electron] Did not receive PORT message, waiting for server...");
+      await waitForServer(`http://127.0.0.1:${port}`);
+      serverPort = port;
+    }
+    console.log(`[Electron] Production server ready on port ${serverPort}`);
   }
 
-  return port;
+  return serverPort;
 }
 
 // ─── Stop the server ─────────────────────────────────────────────────────────
