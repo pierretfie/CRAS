@@ -1,17 +1,22 @@
 import { build } from "esbuild";
-import { mkdirSync, existsSync, cpSync } from "node:fs";
+import { mkdirSync, existsSync, cpSync, rmSync } from "node:fs";
 
 const outdir = "release/server-single";
 if (!existsSync(outdir)) mkdirSync(outdir, { recursive: true });
 
-// Copy client assets to release/public/ for the entry.mjs static file server
+// Copy client assets from Nitro output to release/public/
 const publicDir = "release/public";
 if (!existsSync(publicDir)) mkdirSync(publicDir, { recursive: true });
-cpSync("dist/client", publicDir, { recursive: true });
+cpSync(".output/public", publicDir, { recursive: true });
 console.log(`Copied client assets → ${publicDir}/`);
 
+// Fix incomplete tslib tracing by Nitro — replace with full copy
+const tslibTarget = ".output/server/node_modules/tslib";
+if (existsSync(tslibTarget)) rmSync(tslibTarget, { recursive: true });
+cpSync("node_modules/tslib", tslibTarget, { recursive: true });
+
 await build({
-  entryPoints: ["dist/server/server.js"],
+  entryPoints: [".output/server/index.mjs"],
   bundle: true,
   platform: "node",
   format: "esm",
@@ -24,6 +29,7 @@ await build({
   treeShaking: true,
   // Handle Node.js built-in modules
   external: [],
+  nodePaths: ["node_modules"],
   banner: {
     js: `
 import { createRequire } from "node:module";
