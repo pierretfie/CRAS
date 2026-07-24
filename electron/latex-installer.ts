@@ -197,11 +197,13 @@ async function installMiKTeXSilently(parentWindow?: BrowserWindow | null): Promi
 
     updateProgress(50, "Installing MiKTeX silently...");
 
-    // 2. Run silent install
+    // 2. Run silent install with correct MiKTeX flags
     const installResult = await runCommand(installerPath, [
-      "--install-dir", MIKTEX_INSTALL_DIR,
-      "--auto-setup",
+      "--unattended",
+      "--common-install", MIKTEX_INSTALL_DIR,
+      "--auto-install=yes",
       "--shared",
+      "--paper-size=A4",
     ], { timeout: 300000 });
 
     if (installResult.code !== 0) {
