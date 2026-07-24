@@ -39,7 +39,6 @@ function createUpdateDialog(): BrowserWindow {
     resizable: false,
     frame: false,
     transparent: false,
-    modal: true,
     skipTaskbar: true,
     center: true,
     backgroundColor: "#1a1a2e",
