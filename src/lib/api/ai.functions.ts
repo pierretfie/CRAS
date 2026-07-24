@@ -646,7 +646,7 @@ export const compileLatexToPdf = createServerFn({ method: "POST" })
         }
       }
 
-      const baseCmd = `"${pdflatex}" -interaction=nonstopmode -halt-on-error --enable-installer`;
+      const baseCmd = `"${pdflatex}" -interaction=nonstopmode -halt-on-error`;
 
       try {
         // Diagnostic: catch corruption between extraction and compilation —
