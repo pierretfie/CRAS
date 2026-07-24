@@ -1,4 +1,5 @@
 import { useDataScope } from "@/contexts/data-scope-context";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,22 +21,26 @@ interface UserOption {
 
 export function DataScopeToggle() {
   const { scope, setScope, isAdmin, currentUserId } = useDataScope();
+  const { data: me } = useCurrentUser();
+  const companyId = me?.company?.id;
   const [users, setUsers] = useState<UserOption[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (isAdmin) {
+    if (isAdmin && companyId) {
       setLoading(true);
       query(
         `SELECT p.id, p.name, u.email
          FROM profiles p
          JOIN auth.users u ON u.id = p.id
-         ORDER BY p.name`
+         WHERE p.company_id = $1
+         ORDER BY p.name`,
+        [companyId]
       )
         .then(({ data }) => setUsers((data as UserOption[]) || []))
         .finally(() => setLoading(false));
     }
-  }, [isAdmin]);
+  }, [isAdmin, companyId]);
 
   const isAllData = scope === "all";
   const isMine = scope === "mine";

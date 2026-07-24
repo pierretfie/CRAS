@@ -27,6 +27,10 @@ export function AppSidebar() {
     const api = (window as any).electronAPI;
     if (api?.getVersion) {
       api.getVersion().then((v: string) => setVersion(v)).catch(() => {});
+    } else {
+      // Fallback for web — read from meta tag if present
+      const meta = document.querySelector('meta[name="app-version"]');
+      if (meta) setVersion(meta.getAttribute("content") || "");
     }
   }, []);
   const isActive = (url: string) =>
@@ -119,11 +123,6 @@ export function AppSidebar() {
         )}
       </SidebarContent>
       <SidebarFooter>
-        {version && (
-          <div className="px-3 py-1 text-[10px] text-muted-foreground/50 text-center">
-            v{version}
-          </div>
-        )}
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild isActive={path === "/profile"}>
@@ -137,6 +136,11 @@ export function AppSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+        {version && (
+          <div className="px-2 pb-2 text-center">
+            <span className="text-[10px] text-muted-foreground">v{version}</span>
+          </div>
+        )}
       </SidebarFooter>
     </Sidebar>
   );

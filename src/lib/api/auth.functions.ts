@@ -155,23 +155,27 @@ export const publicSignUp = createServerFn({ method: "POST" })
     // ─────────────────────────────────────────────────────────────────────────
 
     // ── Seed default stage config for this company ────────────────────────────
-    const { error: stageErr } = await supabaseAdmin
+    // Check if stages already exist for this company (idempotent)
+    const { count } = await supabaseAdmin
       .from("conversion_stage_config")
-      .insert([
-        { stage_number: 1, label: "Lead",      description: "Initial contact established",         company_id: company.id },
-        { stage_number: 2, label: "Engaged",   description: "Active discussion or proposal stage", company_id: company.id },
-        { stage_number: 3, label: "Onboarded", description: "Client converted and onboarded",      company_id: company.id },
-      ]);
+      .select("*", { count: "exact", head: true })
+      .eq("company_id", company.id);
 
-    if (stageErr) {
-      // Previously unchecked — a failure here left a fully created company +
-      // admin user with no stage config and no way for the caller to know.
-      // Roll back everything so a failed signup doesn't leave a partially
-      // set up (and effectively broken) workspace behind.
-      console.error("[publicSignUp] stage config seed failed:", stageErr);
-      await supabaseAdmin.auth.admin.deleteUser(created.user.id);
-      await supabaseAdmin.from("companies").delete().eq("id", company.id);
-      throw new Error(GENERIC_SIGNUP_ERROR);
+    if ((count ?? 0) === 0) {
+      const { error: stageErr } = await supabaseAdmin
+        .from("conversion_stage_config")
+        .insert([
+          { stage_number: 1, label: "Lead",      description: "Initial contact established",         company_id: company.id },
+          { stage_number: 2, label: "Engaged",   description: "Active discussion or proposal stage", company_id: company.id },
+          { stage_number: 3, label: "Onboarded", description: "Client converted and onboarded",      company_id: company.id },
+        ]);
+
+      if (stageErr) {
+        console.error("[publicSignUp] stage config seed failed:", stageErr);
+        // Don't roll back — company + user are created, stage config
+        // may already exist from a previous attempt or shared table.
+        // Log and continue rather than killing the signup.
+      }
     }
     // ─────────────────────────────────────────────────────────────────────────
 

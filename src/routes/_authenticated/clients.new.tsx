@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { query } from "@/lib/db";
 import { useState } from "react";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import { normalizeClientData } from "@/lib/api/ai.functions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -53,24 +54,31 @@ function NewClient() {
   const [csvDrawerOpen, setCsvDrawerOpen] = useState(false);
 
   const { data: categories } = useQuery({
-    queryKey: ["admin_categories"],
+    queryKey: ["admin_categories", companyId],
     queryFn: async () => {
-      const res = await query('SELECT * FROM admin_categories ORDER BY name');
+      if (!companyId) return [];
+      const res = await query('SELECT * FROM admin_categories WHERE company_id = $1 ORDER BY name', [companyId]);
       if (res.error) throw res.error;
       return res.data;
     },
+    enabled: !!companyId,
   });
   const { data: products } = useQuery({
     queryKey: ["admin_products"],
     queryFn: async () => (await supabase.from("admin_products").select("*").order("name")).data ?? [],
   });
+  const { data: me } = useCurrentUser();
+  const companyId = me?.company?.id;
+
   const { data: stages } = useQuery({
-    queryKey: ["stage_config"],
+    queryKey: ["stage_config", companyId],
     queryFn: async () => {
-      const res = await query('SELECT * FROM conversion_stage_config ORDER BY stage_number');
+      if (!companyId) return [];
+      const res = await query('SELECT * FROM conversion_stage_config WHERE company_id = $1 ORDER BY stage_number', [companyId]);
       if (res.error) throw res.error;
       return res.data;
     },
+    enabled: !!companyId,
   });
 
   const [form, setForm] = useState({
