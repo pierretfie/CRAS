@@ -7,9 +7,10 @@ directories:
   output: release
 
 files:
-  - dist-electron/**/*
-  - dist/client/**/*
-  - package.json
+  - "dist-electron/*.js"
+  - "dist-electron/*.html"
+  - "dist/client/**/*"
+  - "package.json"
 
 extraResources:
   - from: .env
