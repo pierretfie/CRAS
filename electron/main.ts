@@ -132,7 +132,8 @@ async function startServer(): Promise<number> {
       }
     }
 
-    // Use port 0 so the OS picks a free port — avoids race conditions
+    // Use a fixed port so localStorage origin stays consistent across restarts
+    const FIXED_PORT = 29743;
     const actualPortPromise = new Promise<number>((resolve) => {
       const onOutput = (data: string) => {
         const match = data.match(/PORT:(\d+)/);
@@ -149,7 +150,7 @@ async function startServer(): Promise<number> {
           cwd: path.join(process.resourcesPath),
           env: {
             ...envOverrides,
-            PORT: "0",
+            PORT: String(FIXED_PORT),
             HOST: "127.0.0.1",
             NODE_ENV: "production",
           },
@@ -182,7 +183,7 @@ async function startServer(): Promise<number> {
           cwd: path.join(process.resourcesPath),
           env: {
             ...envOverrides,
-            PORT: "0",
+            PORT: String(FIXED_PORT),
             HOST: "127.0.0.1",
             NODE_ENV: "production",
             PATH: process.env.PATH,
@@ -210,8 +211,8 @@ async function startServer(): Promise<number> {
     serverPort = await actualPortPromise;
     if (serverPort === 0) {
       console.log("[Electron] Did not receive PORT message, waiting for server...");
-      await waitForServer(`http://127.0.0.1:${port}`);
-      serverPort = port;
+      await waitForServer(`http://127.0.0.1:${FIXED_PORT}`);
+      serverPort = FIXED_PORT;
     }
     console.log(`[Electron] Production server ready on port ${serverPort}`);
   }
