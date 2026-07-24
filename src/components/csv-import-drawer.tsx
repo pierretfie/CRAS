@@ -5,6 +5,7 @@ import { query } from "@/lib/db";
 import { parseCsv, ParsedClient, CSV_TEMPLATE_EXAMPLE } from "@/lib/csv-parser";
 import { batchNormalizeClients } from "@/lib/api/ai.functions";
 import { createFollowUp, suggestFrequency } from "@/lib/follow-ups";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import {
   Sheet,
   SheetContent,
@@ -87,14 +88,18 @@ export function CsvImportDrawer({ open, onClose, onImported }: CsvImportDrawerPr
   const [normalizing, setNormalizing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const { data: me } = useCurrentUser();
+  const companyId = me?.company?.id;
 
   const { data: categories } = useQuery({
-    queryKey: ["admin_categories"],
+    queryKey: ["admin_categories", companyId],
     queryFn: async () => {
-      const res = await query("SELECT * FROM admin_categories ORDER BY name");
+      if (!companyId) return [];
+      const res = await query("SELECT * FROM admin_categories WHERE company_id = $1 ORDER BY name", [companyId]);
       if (res.error) throw res.error;
       return (res.data ?? []) as { id: string; name: string }[];
     },
+    enabled: !!companyId,
   });
 
   const { data: products } = useQuery({
@@ -107,12 +112,14 @@ export function CsvImportDrawer({ open, onClose, onImported }: CsvImportDrawerPr
   });
 
   const { data: stages } = useQuery({
-    queryKey: ["stage_config"],
+    queryKey: ["stage_config", companyId],
     queryFn: async () => {
-      const res = await query("SELECT * FROM conversion_stage_config ORDER BY stage_number");
+      if (!companyId) return [];
+      const res = await query("SELECT * FROM conversion_stage_config WHERE company_id = $1 ORDER BY stage_number", [companyId]);
       if (res.error) throw res.error;
       return (res.data ?? []) as { id: string; stage_number: number; label: string }[];
     },
+    enabled: !!companyId,
   });
 
   function reset() {

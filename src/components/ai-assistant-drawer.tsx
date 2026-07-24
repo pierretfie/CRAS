@@ -145,7 +145,7 @@ export function AIAssistantDrawer() {
   // Always load full team data — filtering causes gaps that mislead the AI.
   // If users want personal analysis, they ask the AI directly and it finds
   // their patterns from the TOP CLOSERS / TOP SOURCERS sections.
-  const { data: analytics, isLoading: analyticsLoading } = useAnalyticsData(null);
+  const { data: analytics, isLoading: analyticsLoading } = useAnalyticsData(null, me?.company?.id);
 
   // Fetch ALL active follow-ups for full context
   const { data: followUpContext } = useQuery({

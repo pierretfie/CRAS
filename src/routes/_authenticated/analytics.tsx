@@ -10,6 +10,7 @@ import { useAIDrawer } from "@/hooks/use-ai-drawer";
 import { Link } from "@tanstack/react-router";
 import { useDataScope } from "@/contexts/data-scope-context";
 import { DataScopeToggle } from "@/components/data-scope-toggle";
+import { useCurrentUser } from "@/hooks/use-current-user";
 import {
   ChartContainer,
   ChartTooltip,
@@ -328,7 +329,8 @@ function TimeFilter({ value, onChange }: { value: TimePeriod; onChange: (p: Time
 
 function AnalyticsPage() {
   const { effectiveUserId } = useDataScope();
-  const { data: rawData, isLoading } = useAnalyticsData(effectiveUserId);
+  const { data: me } = useCurrentUser();
+  const { data: rawData, isLoading } = useAnalyticsData(effectiveUserId, me?.company?.id);
   const { toggle } = useAIDrawer();
   const [timePeriod, setTimePeriod] = useState<TimePeriod>("all");
 

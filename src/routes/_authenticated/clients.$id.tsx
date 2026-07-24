@@ -58,21 +58,23 @@ function ClientDetail() {
   const [followUpReloadTrigger, setFollowUpReloadTrigger] = useState(0);
 
   const { data: client, refetch } = useQuery({
-    queryKey: ["client", id],
+    queryKey: ["client", id, me?.company?.id],
     queryFn: async () => {
+      if (!me?.company?.id) return null;
       const res = await query(
         `SELECT c.*, p.name AS created_by_name, p.department AS created_by_dept
          FROM clients c
          LEFT JOIN profiles p ON p.id = c.created_by
-         WHERE c.id = $1`,
-        [id]
+         WHERE c.id = $1 AND c.company_id = $2`,
+        [id, me.company.id]
       );
       if (res.error) throw res.error;
       return res.data && res.data.length > 0 ? res.data[0] : null;
     },
+    enabled: !!me?.company?.id,
   });
   const { data: events } = useQuery({
-    queryKey: ["events", id],
+    queryKey: ["events", id, me?.company?.id],
     queryFn: async () => {
       const res = await query(
         `SELECT e.*, p.name AS updated_by_name
@@ -85,6 +87,7 @@ function ClientDetail() {
       if (res.error) throw res.error;
       return res.data;
     },
+    enabled: !!client,
   });
 
   // Check access: owner, admin, or has an approved request
@@ -656,21 +659,22 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
 
     // Update clients table — only update fields relevant to the mode
     // (never overwrite status/current_stage/etc with NULL when not changing them)
+    // company_id check ensures we can only modify clients in our company
     let clientRes;
     if (mode === "won") {
       clientRes = await query(
-        `UPDATE clients SET status = 'won', current_stage = 3, stage_value = 1 WHERE id = $1`,
-        [client.id]
+        `UPDATE clients SET status = 'won', current_stage = 3, stage_value = 1 WHERE id = $1 AND company_id = $2`,
+        [client.id, me?.company?.id]
       );
     } else if (mode === "lost") {
       clientRes = await query(
-        `UPDATE clients SET status = 'lost', lost_reason = $1 WHERE id = $2`,
-        [reason, client.id]
+        `UPDATE clients SET status = 'lost', lost_reason = $1 WHERE id = $2 AND company_id = $3`,
+        [reason, client.id, me?.company?.id]
       );
     } else {
       clientRes = await query(
-        `UPDATE clients SET current_stage = $1, stage_value = $2, stage_notes = $3 WHERE id = $4`,
-        [toStage, stageVal, description, client.id]
+        `UPDATE clients SET current_stage = $1, stage_value = $2, stage_notes = $3 WHERE id = $4 AND company_id = $5`,
+        [toStage, stageVal, description, client.id, me?.company?.id]
       );
     }
     if (clientRes.error) {

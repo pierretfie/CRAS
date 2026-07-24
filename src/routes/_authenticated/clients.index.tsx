@@ -11,6 +11,7 @@ import { PlusCircle, Search } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useDataScope } from "@/contexts/data-scope-context";
 import { DataScopeToggle } from "@/components/data-scope-toggle";
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 export const Route = createFileRoute("/_authenticated/clients/")({
   component: ClientsList,
@@ -18,57 +19,61 @@ export const Route = createFileRoute("/_authenticated/clients/")({
 
 function ClientsList() {
   const { effectiveUserId } = useDataScope();
+  const { data: me } = useCurrentUser();
+  const companyId = me?.company?.id;
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<"all" | "active" | "won" | "lost">("all");
 
   const { data, isLoading } = useQuery({
-    queryKey: ["clients", "v2", effectiveUserId],
+    queryKey: ["clients", "v2", effectiveUserId, companyId],
     queryFn: async () => {
+      if (!companyId) return [];
+
       if (!effectiveUserId) {
-        // "All Data" mode - fetch all clients
+        // "All Data" mode - scoped to company
         const sql = `SELECT c.*, p.name AS created_by_name, p.department AS created_by_dept
            FROM clients c
            LEFT JOIN profiles p ON p.id = c.created_by
+           WHERE c.company_id = $1
            ORDER BY c.updated_at DESC`;
-        const res = await query(sql, []);
+        const res = await query(sql, [companyId]);
         if (res.error) throw res.error;
         return res.data;
       }
-      
-      // "Your Data" mode - find ALL clients the user is associated with
-      // Same logic as analytics: created, worked on, follow-ups, or activity logs
+
+      // "Your Data" mode - scoped to company + user
       const clientIdsSql = `
         SELECT DISTINCT client_id FROM (
-          SELECT id as client_id FROM clients WHERE created_by = $1
+          SELECT id as client_id FROM clients WHERE created_by = $1 AND company_id = $2
           UNION
-          SELECT client_id FROM client_stage_events WHERE user_id = $1
+          SELECT e.client_id FROM client_stage_events e JOIN clients c ON c.id = e.client_id WHERE e.user_id = $1 AND c.company_id = $2
           UNION
-          SELECT client_id FROM client_follow_ups WHERE user_id = $1
+          SELECT f.client_id FROM client_follow_ups f JOIN clients c ON c.id = f.client_id WHERE f.user_id = $1 AND c.company_id = $2
           UNION
-          SELECT client_id FROM follow_up_logs WHERE user_id = $1
+          SELECT l.client_id FROM follow_up_logs l JOIN clients c ON c.id = l.client_id WHERE l.user_id = $1 AND c.company_id = $2
         ) AS user_clients
       `;
-      
-      const clientIdsRes = await query(clientIdsSql, [effectiveUserId]);
+
+      const clientIdsRes = await query(clientIdsSql, [effectiveUserId, companyId]);
       if (clientIdsRes.error) throw clientIdsRes.error;
-      
+
       const clientIds = ((clientIdsRes.data ?? []) as Array<{ client_id: string }>).map(row => row.client_id);
-      
+
       if (clientIds.length === 0) {
         return [];
       }
-      
-      // Fetch full client data for these IDs
+
       const sql = `SELECT c.*, p.name AS created_by_name, p.department AS created_by_dept
          FROM clients c
          LEFT JOIN profiles p ON p.id = c.created_by
-         WHERE c.id = ANY($1::uuid[])
+         WHERE c.id = ANY($1::uuid[]) AND c.company_id = $2
          ORDER BY c.updated_at DESC`;
-      
-      const res = await query(sql, [clientIds]);
+
+      const res = await query(sql, [clientIds, companyId]);
       if (res.error) throw res.error;
       return res.data;
     },
+    enabled: !!companyId,
   });
 
   const { data: products } = useQuery({

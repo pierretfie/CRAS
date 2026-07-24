@@ -120,11 +120,13 @@ function UsersTab() {
   const qc = useQueryClient();
   const { data: me } = useCurrentUser();
   const { data: users, refetch } = useQuery({
-    queryKey: ["all-profiles"],
+    queryKey: ["all-profiles", me?.company?.id],
     queryFn: async () => {
+      if (!me?.company?.id) return [];
+      const companyId = me.company.id;
       const [{ data: profiles }, { data: roles }] = await Promise.all([
-        query('SELECT * FROM profiles ORDER BY created_at DESC'),
-        query('SELECT * FROM user_roles'),
+        query('SELECT * FROM profiles WHERE company_id = $1 ORDER BY created_at DESC', [companyId]),
+        query('SELECT ur.* FROM user_roles ur JOIN profiles p ON p.id = ur.user_id WHERE p.company_id = $1', [companyId]),
       ]);
       if (!profiles) return [];
       const roleMap = new Map<string, string[]>();
@@ -135,6 +137,7 @@ function UsersTab() {
       }
       return (profiles as any[]).map((p) => ({ ...p, roles: roleMap.get(p.id) ?? [] }));
     },
+    enabled: !!me?.company?.id,
   });
 
   // Create user form
@@ -582,23 +585,28 @@ function CompanyTab() {
 
 function CategoriesTab() {
   const qc = useQueryClient();
+  const { data: me } = useCurrentUser();
+  const companyId = me?.company?.id;
   const { data: cats } = useQuery({
-    queryKey: ["admin_categories"],
+    queryKey: ["admin_categories", companyId],
     queryFn: async () => {
-      const res = await query('SELECT * FROM admin_categories ORDER BY name');
+      if (!companyId) return [];
+      const res = await query('SELECT * FROM admin_categories WHERE company_id = $1 ORDER BY name', [companyId]);
       if (res.error) throw res.error;
       return res.data;
     },
+    enabled: !!companyId,
   });
   const [name, setName] = useState("");
 
   async function add() {
     if (!name.trim()) return;
+    if (!companyId) return toast.error("Company not found");
     try {
-      const res = await query('INSERT INTO admin_categories (name) VALUES ($1)', [name.trim()]);
+      const res = await query('INSERT INTO admin_categories (name, company_id) VALUES ($1, $2)', [name.trim(), companyId]);
       if (res.error) throw res.error;
       setName("");
-      qc.invalidateQueries({ queryKey: ["admin_categories"] });
+      qc.invalidateQueries({ queryKey: ["admin_categories", companyId] });
     } catch (err: any) {
       console.error(err);
       toast.error(err.message ?? "Failed to add category");
@@ -607,9 +615,10 @@ function CategoriesTab() {
 
   async function del(id: string) {
     try {
-      const res = await query('DELETE FROM admin_categories WHERE id = $1', [id]);
+      if (!companyId) return toast.error("Company not found");
+      const res = await query('DELETE FROM admin_categories WHERE id = $1 AND company_id = $2', [id, companyId]);
       if (res.error) throw res.error;
-      qc.invalidateQueries({ queryKey: ["admin_categories"] });
+      qc.invalidateQueries({ queryKey: ["admin_categories", companyId] });
     } catch (err: any) {
       console.error(err);
       toast.error(err.message ?? "Failed to delete category");
@@ -689,13 +698,17 @@ function ProductsTab() {
 
 function StagesTab() {
   const qc = useQueryClient();
+  const { data: me } = useCurrentUser();
+  const companyId = me?.company?.id;
   const { data: stages } = useQuery({
-    queryKey: ["stage_config"],
+    queryKey: ["stage_config", companyId],
     queryFn: async () => {
-      const res = await query('SELECT * FROM conversion_stage_config ORDER BY stage_number');
+      if (!companyId) return [];
+      const res = await query('SELECT * FROM conversion_stage_config WHERE company_id = $1 ORDER BY stage_number', [companyId]);
       if (res.error) throw res.error;
       return res.data;
     },
+    enabled: !!companyId,
   });
 
   const [draft, setDraft] = useState<Record<string, { label: string; description: string }>>({});
@@ -725,11 +738,11 @@ function StagesTab() {
           values.push(patch.description);
         }
         if (setClause === "") continue;
-        const res = await query(`UPDATE conversion_stage_config SET ${setClause} WHERE id = $${values.length + 1}`, [...values, id]);
+        const res = await query(`UPDATE conversion_stage_config SET ${setClause} WHERE id = $${values.length + 1} AND company_id = $${values.length + 2}`, [...values, id, companyId]);
         if (res.error) throw res.error;
       }
       setDraft({});
-      qc.invalidateQueries({ queryKey: ["stage_config"] });
+        qc.invalidateQueries({ queryKey: ["stage_config", companyId] });
       toast.success("Stages updated successfully");
     } catch (err: any) {
       console.error(err);
@@ -827,8 +840,8 @@ function splitMessage(text: string): { visible: string; latex: string | null; fi
 }
 
 function ConsoleTab() {
-  const { data: analytics } = useAnalyticsData();
   const { data: me } = useCurrentUser();
+  const { data: analytics } = useAnalyticsData(null, me?.company?.id);
   const [messages, setMessages] = useState<Msg[]>(() => {
     try {
       const saved = localStorage.getItem("admin-ai-chat-history");
