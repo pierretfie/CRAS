@@ -240,8 +240,8 @@ async function installMiKTeXSilently(parentWindow?: BrowserWindow | null): Promi
     if (fs.existsSync(initexmf)) {
       // AutoInstall=1 means download missing packages without asking
       await runCommand(initexmf, ["--set-config-value=[MPM]AutoInstall=1"], { timeout: 30000 });
-      // Force quiet operation — never show package install dialogs
-      await runCommand(initexmf, ["--set-config-value=[MPM]Repository=ctan"], { timeout: 30000 });
+      // Console log level 0 = quiet, no prompts
+      await runCommand(initexmf, ["--set-config-value=[Core]SharedSetup=1"], { timeout: 30000 });
     }
 
     updateProgress(80, "Pre-installing LaTeX packages...");
@@ -395,10 +395,10 @@ Test \\tableofcontents
   const pdflatex = getPdflatexPath();
   const pdflatexCmd = fs.existsSync(pdflatex) ? pdflatex : "pdflatex";
 
-  // Compile up to 3 times — each pass may trigger auto-install of more packages
-  for (let pass = 0; pass < 3; pass++) {
-    await runCommand(pdflatexCmd, ["-interaction=nonstopmode", "-halt-on-error", testFile], { timeout: 120000 });
-  }
+    // Compile up to 3 times — each pass may trigger auto-install of more packages
+    for (let pass = 0; pass < 3; pass++) {
+      await runCommand(pdflatexCmd, ["-interaction=nonstopmode", "-halt-on-error", "--enable-installer", testFile], { timeout: 120000 });
+    }
 
   try { fs.rmSync(testDir, { recursive: true, force: true }); } catch {}
 }
