@@ -34,11 +34,25 @@ const MIKTEX_INSTALL_DIR = path.join(
  * Check if pdflatex is available on the system.
  */
 export function isPdflatexAvailable(): boolean {
+  // First check PATH
   try {
     const cmd = process.platform === "win32" ? "where pdflatex" : "which pdflatex";
     execSync(cmd, { stdio: "ignore" });
     return true;
   } catch {
+    // Not in PATH — check common MiKTeX install location
+    if (process.platform === "win32") {
+      const miktexPdflatex = path.join(
+        process.env.ProgramFiles || "C:\\Program Files",
+        "MiKTeX", "miktex", "bin", "x64", "pdflatex.exe",
+      );
+      if (fs.existsSync(miktexPdflatex)) {
+        // Add to PATH so child processes can find it
+        const miktexBin = path.dirname(miktexPdflatex);
+        process.env.PATH = miktexBin + ";" + (process.env.PATH || "");
+        return true;
+      }
+    }
     return false;
   }
 }
