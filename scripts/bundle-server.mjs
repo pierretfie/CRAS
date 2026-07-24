@@ -20,7 +20,7 @@ await build({
   bundle: true,
   platform: "node",
   format: "esm",
-  outfile: `${outdir}/server.mjs`,
+  outfile: `${outdir}/entry.mjs`,
   // Bundle EVERYTHING — no external deps needed
   packages: "bundle",
   target: "node20",
@@ -30,12 +30,6 @@ await build({
   // Handle Node.js built-in modules
   external: [],
   nodePaths: ["node_modules"],
-  banner: {
-    js: `
-import { createRequire } from "node:module";
-const require = createRequire(import.meta.url);
-`,
-  },
   // Define globals for Node.js ESM
   define: {
     "process.env.NODE_ENV": '"production"',

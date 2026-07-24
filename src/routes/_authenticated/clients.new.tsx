@@ -52,6 +52,8 @@ function NewClient() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [csvDrawerOpen, setCsvDrawerOpen] = useState(false);
+  const { data: me } = useCurrentUser();
+  const companyId = me?.company?.id;
 
   const { data: categories } = useQuery({
     queryKey: ["admin_categories", companyId],
@@ -67,8 +69,6 @@ function NewClient() {
     queryKey: ["admin_products"],
     queryFn: async () => (await supabase.from("admin_products").select("*").order("name")).data ?? [],
   });
-  const { data: me } = useCurrentUser();
-  const companyId = me?.company?.id;
 
   const { data: stages } = useQuery({
     queryKey: ["stage_config", companyId],

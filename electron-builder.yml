@@ -9,7 +9,6 @@ directories:
 files:
   - "dist-electron/*.js"
   - "dist-electron/*.html"
-  - "dist/client/**/*"
   - "package.json"
 
 extraResources:
