@@ -246,12 +246,7 @@ function stopServer(): void {
 
 // ─── Create the main window ──────────────────────────────────────────────────
 async function createWindow(): Promise<void> {
-  // Check pdflatex on first launch
-  if (!isPdflatexAvailable()) {
-    await ensurePdflatex(null);
-  }
-
-  // Start the server
+  // Start the server first
   serverPort = await startServer();
 
   // Create the browser window
@@ -282,6 +277,11 @@ async function createWindow(): Promise<void> {
     shell.openExternal(url);
     return { action: "deny" };
   });
+
+  // Check pdflatex AFTER window exists so dialogs have a parent
+  if (!isPdflatexAvailable()) {
+    await ensurePdflatex(mainWindow);
+  }
 
   if (isDev) {
     mainWindow.webContents.openDevTools();
