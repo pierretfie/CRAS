@@ -235,29 +235,51 @@ async function installMiKTeXSilently(parentWindow?: BrowserWindow | null): Promi
 
     updateProgress(70, "Configuring MiKTeX...");
 
-    // 4. Enable auto-install (never prompt for packages again)
+    // 4. Configure MiKTeX: auto-install packages silently, never prompt
     const initexmf = getInitexmfPath();
     if (fs.existsSync(initexmf)) {
+      // AutoInstall=1 means download missing packages without asking
       await runCommand(initexmf, ["--set-config-value=[MPM]AutoInstall=1"], { timeout: 30000 });
+      // Force quiet operation — never show package install dialogs
+      await runCommand(initexmf, ["--set-config-value=[MPM]Repository=ctan"], { timeout: 30000 });
     }
 
-    updateProgress(80, "Installing LaTeX packages...");
+    updateProgress(80, "Pre-installing LaTeX packages...");
 
-    // 5. Install all required packages via mpm
-    const mpm = getMpmPath();
-    if (fs.existsSync(mpm)) {
-      // First update the package database
-      await runCommand(mpm, ["--update"], { timeout: 60000 });
+    // 5. Pre-install packages by compiling a test doc that uses them all.
+    //    This is more reliable than mpm --install because MiKTeX package names
+    //    don't always match LaTeX \usepackage names.
+    const testTex = `\\documentclass{article}
+\\usepackage[margin=1in]{geometry}
+\\usepackage{xcolor}
+\\usepackage{titlesec}
+\\usepackage{fancyhdr}
+\\usepackage{booktabs}
+\\usepackage{tabularx}
+\\usepackage{graphicx}
+\\usepackage{enumitem}
+\\usepackage{hyperref}
+\\usepackage{parskip}
+\\usepackage{colortbl}
+\\begin{document}
+Test \\tableofcontents
+\\begin{tabular}{lcr} a & b & c \\end{tabular}
+\\end{document}`;
+    const testDir = path.join(process.env.TEMP || process.env.TMP || ".", "cras-latex-test");
+    if (!fs.existsSync(testDir)) fs.mkdirSync(testDir, { recursive: true });
+    const testFile = path.join(testDir, "test.tex");
+    fs.writeFileSync(testFile, testTex);
 
-      // Install each required package
-      for (const pkg of REQUIRED_MIKTEX_PACKAGES) {
-        updateProgress(
-          80 + Math.round((REQUIRED_MIKTEX_PACKAGES.indexOf(pkg) / REQUIRED_MIKTEX_PACKAGES.length) * 18),
-          `Installing package: ${pkg}`,
-        );
-        await runCommand(mpm, ["--install", pkg], { timeout: 30000 });
-      }
+    // Compile 3 times (TOC needs extra passes) — MiKTeX will auto-install any missing packages
+    const pdflatex = getPdflatexPath();
+    const pdflatexCmd = fs.existsSync(pdflatex) ? pdflatex : "pdflatex";
+    for (let pass = 0; pass < 3; pass++) {
+      updateProgress(85 + pass * 5, `Compiling test document (pass ${pass + 1}/3)...`);
+      await runCommand(pdflatexCmd, ["-interaction=nonstopmode", "-halt-on-error", testFile], { timeout: 120000 });
     }
+
+    // Clean up test files
+    try { fs.rmSync(testDir, { recursive: true, force: true }); } catch {}
 
     updateProgress(100, "Installation complete!");
 
@@ -301,7 +323,13 @@ async function installMiKTeXSilently(parentWindow?: BrowserWindow | null): Promi
  * Returns true if pdflatex is available.
  */
 export async function ensurePdflatex(parentWindow?: BrowserWindow | null): Promise<boolean> {
-  if (isPdflatexAvailable()) return true;
+  if (isPdflatexAvailable()) {
+    // pdflatex found — ensure packages are installed (silently, no UI)
+    if (process.platform === "win32") {
+      await ensurePackagesInstalled();
+    }
+    return true;
+  }
 
   // On Windows, try automatic MiKTeX install
   if (process.platform === "win32") {
@@ -327,6 +355,52 @@ export async function ensurePdflatex(parentWindow?: BrowserWindow | null): Promi
   }
 
   return false;
+}
+
+/**
+ * Ensure all required LaTeX packages are installed (Windows/MiKTeX only).
+ * Compiles a test document that uses all required packages — MiKTeX auto-installs anything missing.
+ * Runs silently with no UI.
+ */
+async function ensurePackagesInstalled(): Promise<void> {
+  const initexmf = getInitexmfPath();
+
+  // Configure MiKTeX to auto-install silently
+  if (fs.existsSync(initexmf)) {
+    await runCommand(initexmf, ["--set-config-value=[MPM]AutoInstall=1"], { timeout: 30000 });
+  }
+
+  const testTex = `\\documentclass{article}
+\\usepackage[margin=1in]{geometry}
+\\usepackage{xcolor}
+\\usepackage{titlesec}
+\\usepackage{fancyhdr}
+\\usepackage{booktabs}
+\\usepackage{tabularx}
+\\usepackage{graphicx}
+\\usepackage{enumitem}
+\\usepackage{hyperref}
+\\usepackage{parskip}
+\\usepackage{colortbl}
+\\begin{document}
+Test \\tableofcontents
+\\begin{tabular}{lcr} a & b & c \\end{tabular}
+\\end{document}`;
+
+  const testDir = path.join(process.env.TEMP || process.env.TMP || ".", "cras-latex-pkgcheck");
+  if (!fs.existsSync(testDir)) fs.mkdirSync(testDir, { recursive: true });
+  const testFile = path.join(testDir, "test.tex");
+  fs.writeFileSync(testFile, testTex);
+
+  const pdflatex = getPdflatexPath();
+  const pdflatexCmd = fs.existsSync(pdflatex) ? pdflatex : "pdflatex";
+
+  // Compile up to 3 times — each pass may trigger auto-install of more packages
+  for (let pass = 0; pass < 3; pass++) {
+    await runCommand(pdflatexCmd, ["-interaction=nonstopmode", "-halt-on-error", testFile], { timeout: 120000 });
+  }
+
+  try { fs.rmSync(testDir, { recursive: true, force: true }); } catch {}
 }
 
 /**
