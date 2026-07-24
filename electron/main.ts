@@ -11,6 +11,12 @@ import { ensurePdflatex, isPdflatexAvailable, tryAutoInstallPdflatex } from "./l
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// ─── Handle --version flag ────────────────────────────────────────────────────
+if (process.argv.includes("--version") || process.argv.includes("-v")) {
+  console.log(app.getVersion());
+  app.quit();
+}
+
 // ─── Single instance lock ─────────────────────────────────────────────────────
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
