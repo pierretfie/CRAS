@@ -17,19 +17,13 @@
     overflow: hidden;
     user-select: none;
   }
-  .dragbar {
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 32px;
-    -webkit-app-region: drag;
-  }
   .dialog {
     width: 420px;
     padding: 32px 28px 24px;
     background: #16213e;
     border-radius: 16px;
     border: 1px solid rgba(255,255,255,0.06);
-    box-shadow: 0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
   }
   .icon {
     width: 48px;
@@ -104,7 +98,6 @@
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
-    -webkit-app-region: no-drag;
   }
   .btn:hover { transform: translateY(-1px); }
   .btn:active { transform: translateY(0); }
@@ -127,7 +120,6 @@
 </style>
 </head>
 <body>
-<div class="dragbar"></div>
 <div class="dialog">
   <div class="icon">
     <svg viewBox="0 0 24 24"><path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3zm-1 14.5v-2h2v2h-2zm0-4V7h2v5.5h-2z"/></svg>
@@ -152,23 +144,28 @@
   </div>
 </div>
 <script>
-  const versionEl = document.getElementById('version');
-  const descEl = document.getElementById('description');
-  const progressEl = document.getElementById('progress');
-  const progressPercent = document.getElementById('progress-percent');
-  const progressText = document.getElementById('progress-text');
-  const progressFill = document.getElementById('progress-fill');
-  const btnRestart = document.getElementById('btn-restart');
-  const btnLater = document.getElementById('btn-later');
+  var versionEl = document.getElementById('version');
+  var descEl = document.getElementById('description');
+  var progressEl = document.getElementById('progress');
+  var progressPercent = document.getElementById('progress-percent');
+  var progressText = document.getElementById('progress-text');
+  var progressFill = document.getElementById('progress-fill');
+  var btnRestart = document.getElementById('btn-restart');
+  var btnLater = document.getElementById('btn-later');
 
-  if (window.electronAPI) {
+  function setupAPI() {
+    if (!window.electronAPI) {
+      setTimeout(setupAPI, 100);
+      return;
+    }
+
     window.electronAPI.onUpdateInfo(function(data) {
       versionEl.textContent = 'v' + data.version;
       if (data.status === 'downloaded') {
         descEl.textContent = 'Update downloaded and ready to install.';
         progressEl.classList.remove('active');
         btnRestart.disabled = false;
-        btnLater.style.display = 'none';
+        btnLater.textContent = 'Close';
       }
     });
 
@@ -178,16 +175,22 @@
       progressPercent.textContent = data.percent + '%';
       if (data.percent < 100) {
         progressText.textContent = 'Downloading...';
+      } else {
+        progressText.textContent = 'Download complete!';
       }
+    });
+
+    btnRestart.addEventListener('click', function(e) {
+      e.preventDefault();
+      window.electronAPI.updateRestart();
+    });
+    btnLater.addEventListener('click', function(e) {
+      e.preventDefault();
+      window.electronAPI.updateLater();
     });
   }
 
-  btnRestart.addEventListener('click', function() {
-    if (window.electronAPI) window.electronAPI.updateRestart();
-  });
-  btnLater.addEventListener('click', function() {
-    if (window.electronAPI) window.electronAPI.updateLater();
-  });
+  setupAPI();
 </script>
 </body>
 </html>
