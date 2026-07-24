@@ -159,9 +159,14 @@ async function installMiKTeXSilently(parentWindow?: BrowserWindow | null): Promi
     parent: win,
     modal: true,
     resizable: false,
-    closable: false,
+    closable: true,
     title: "Installing MiKTeX",
     webPreferences: { nodeIntegration: false },
+  });
+  // Prevent closing during install — will be re-enabled on completion
+  let installDone = false;
+  progressWin.on("close", (e) => {
+    if (!installDone) e.preventDefault();
   });
   progressWin.setMenuBarVisibility(false);
   progressWin.loadURL(
@@ -271,6 +276,7 @@ async function installMiKTeXSilently(parentWindow?: BrowserWindow | null): Promi
     });
     return false;
   } finally {
+    installDone = true;
     if (!progressWin.isDestroyed()) progressWin.close();
   }
 }
