@@ -16,9 +16,10 @@ autoUpdater.autoInstallOnAppQuit = false;
 let updateDialog: BrowserWindow | null = null;
 let updateVersion = "";
 let mainWindowRef: BrowserWindow | null = null;
-let isUpdateDownloaded = false;
+let skippedVersions: Set<string> = new Set();
 
 const dialogHtmlPath = path.join(__dirname, "update-dialog.html");
+const SKIP_FILE = path.join(__dirname, ".skip-update");
 
 function isDialogHtmlAvailable(): boolean {
   try {
@@ -29,7 +30,7 @@ function isDialogHtmlAvailable(): boolean {
 }
 
 function sendToDialog(channel: string, ...args: unknown[]) {
-  if (updateDialog && !updateDialog.isDestroyed() && !updateDialog.isDestroyed()) {
+  if (updateDialog && !updateDialog.isDestroyed()) {
     updateDialog.webContents.send(channel, ...args);
   }
 }
@@ -85,7 +86,21 @@ function createUpdateDialog(): BrowserWindow {
   return updateDialog;
 }
 
+// ── Later / Skip ────────────────────────────────────────────────────────────
+// "Later" dismisses the dialog. If download hasn't finished, it keeps downloading
+// in the background so the update is ready on next launch.
 ipcMain.on("update:later", () => {
+  if (updateDialog && !updateDialog.isDestroyed()) {
+    updateDialog.close();
+  }
+});
+
+// ── Skip this version ──────────────────────────────────────────────────────
+ipcMain.on("update:skip", () => {
+  if (updateVersion) {
+    skippedVersions.add(updateVersion);
+    try { fs.writeFileSync(SKIP_FILE, updateVersion); } catch {}
+  }
   if (updateDialog && !updateDialog.isDestroyed()) {
     updateDialog.close();
   }
@@ -98,6 +113,15 @@ ipcMain.on("update:restart", () => {
 export function initAutoUpdate(mainWindow: BrowserWindow): void {
   mainWindowRef = mainWindow;
 
+  // Load previously skipped version
+  try {
+    if (fs.existsSync(SKIP_FILE)) {
+      const v = fs.readFileSync(SKIP_FILE, "utf-8").trim();
+      if (v) skippedVersions.add(v);
+    }
+  } catch {}
+
+  // Check after 10s, then every 4 hours
   setTimeout(() => {
     autoUpdater.checkForUpdates().catch(() => {});
   }, 10_000);
@@ -107,19 +131,20 @@ export function initAutoUpdate(mainWindow: BrowserWindow): void {
   }, 4 * 60 * 60 * 1000);
 
   autoUpdater.on("update-available", (info) => {
+    // Skip if user chose to skip this version
+    if (skippedVersions.has(info.version)) return;
+
     updateVersion = info.version;
-    isUpdateDownloaded = false;
     const dlg = createUpdateDialog();
 
     dlg.webContents.on("did-finish-load", () => {
-      // Send current state — if already downloaded, send "downloaded" not "available"
-      const status = isUpdateDownloaded ? "downloaded" : "available";
       dlg.webContents.send("update:info", {
         version: info.version,
-        status,
+        status: "available",
       });
     });
 
+    // Start download
     autoUpdater.downloadUpdate().catch(() => {});
   });
 
@@ -134,12 +159,10 @@ export function initAutoUpdate(mainWindow: BrowserWindow): void {
   });
 
   autoUpdater.on("update-downloaded", () => {
-    isUpdateDownloaded = true;
     sendToDialog("update:info", {
       version: updateVersion,
       status: "downloaded",
     });
-    // Fallback for inline HTML dialog
     if (!isDialogHtmlAvailable() && updateDialog && !updateDialog.isDestroyed()) {
       updateDialog.webContents.executeJavaScript(
         `document.getElementById('btn').style.display='inline-block';document.getElementById('status').textContent='Update ready! Click Restart & Install.';document.getElementById('bar').style.width='100%';`,
