@@ -1,5 +1,5 @@
 import electronUpdater from "electron-updater";
-import { BrowserWindow, ipcMain, dialog } from "electron";
+import { BrowserWindow, ipcMain } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -16,6 +16,7 @@ autoUpdater.autoInstallOnAppQuit = false;
 let updateDialog: BrowserWindow | null = null;
 let updateVersion = "";
 let mainWindowRef: BrowserWindow | null = null;
+let isUpdateDownloaded = false;
 
 const dialogHtmlPath = path.join(__dirname, "update-dialog.html");
 
@@ -24,6 +25,21 @@ function isDialogHtmlAvailable(): boolean {
     return fs.existsSync(dialogHtmlPath);
   } catch {
     return false;
+  }
+}
+
+function sendToDialog(channel: string, ...args: unknown[]) {
+  if (updateDialog && !updateDialog.isDestroyed() && !updateDialog.isDestroyed()) {
+    updateDialog.webContents.send(channel, ...args);
+  }
+}
+
+function updateFallbackDialog(percent: number, status: string) {
+  if (!updateDialog || updateDialog.isDestroyed()) return;
+  if (!isDialogHtmlAvailable()) {
+    updateDialog.webContents.executeJavaScript(
+      `document.getElementById('bar').style.width='${percent}%';document.getElementById('status').textContent='${status}';`,
+    );
   }
 }
 
@@ -70,23 +86,10 @@ function createUpdateDialog(): BrowserWindow {
   return updateDialog;
 }
 
-function sendToDialog(channel: string, ...args: unknown[]) {
-  if (updateDialog && !updateDialog.isDestroyed()) {
-    updateDialog.webContents.send(channel, ...args);
-  }
-}
-
-function updateFallbackDialog(percent: number, status: string) {
-  if (!updateDialog || updateDialog.isDestroyed()) return;
-  if (!isDialogHtmlAvailable()) {
-    updateDialog.webContents.executeJavaScript(
-      `document.getElementById('bar').style.width='${percent}%';document.getElementById('status').textContent='${status}';`,
-    );
-  }
-}
-
 ipcMain.on("update:later", () => {
-  updateDialog?.close();
+  if (updateDialog && !updateDialog.isDestroyed()) {
+    updateDialog.close();
+  }
 });
 
 ipcMain.on("update:restart", () => {
@@ -106,18 +109,17 @@ export function initAutoUpdate(mainWindow: BrowserWindow): void {
 
   autoUpdater.on("update-available", (info) => {
     updateVersion = info.version;
+    isUpdateDownloaded = false;
     const dlg = createUpdateDialog();
 
-    if (isDialogHtmlAvailable()) {
-      dlg.webContents.on("did-finish-load", () => {
-        dlg.webContents.send("update:info", {
-          version: info.version,
-          status: "available",
-        });
+    dlg.webContents.on("did-finish-load", () => {
+      // Send current state — if already downloaded, send "downloaded" not "available"
+      const status = isUpdateDownloaded ? "downloaded" : "available";
+      dlg.webContents.send("update:info", {
+        version: info.version,
+        status,
       });
-    } else {
-      updateFallbackDialog(0, `New version ${info.version} available. Downloading...`);
-    }
+    });
 
     autoUpdater.downloadUpdate().catch(() => {});
   });
@@ -133,10 +135,12 @@ export function initAutoUpdate(mainWindow: BrowserWindow): void {
   });
 
   autoUpdater.on("update-downloaded", () => {
+    isUpdateDownloaded = true;
     sendToDialog("update:info", {
       version: updateVersion,
       status: "downloaded",
     });
+    // Fallback for inline HTML dialog
     if (!isDialogHtmlAvailable() && updateDialog && !updateDialog.isDestroyed()) {
       updateDialog.webContents.executeJavaScript(
         `document.getElementById('btn').style.display='inline-block';document.getElementById('status').textContent='Update ready! Click Restart & Install.';document.getElementById('bar').style.width='100%';`,
