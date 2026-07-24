@@ -608,7 +608,22 @@ export const compileLatexToPdf = createServerFn({ method: "POST" })
         result.push(l);
       }
 
-      return result.join("\n");
+      // ── Fix common AI mistakes that cause keyval errors ───────────────
+      // AI sometimes generates \usepackage[1in]{geometry} instead of \usepackage[margin=1in]{geometry}
+      let fixed = result.join("\n");
+      fixed = fixed.replace(
+        /\\usepackage\[(\d+(?:\.\d+)?(?:in|cm|mm|pt))\]\{geometry\}/g,
+        "\\usepackage[margin=$1]{geometry}",
+      );
+      // Fix bare dimension in geometry options (e.g., [1in] → [margin=1in])
+      fixed = fixed.replace(
+        /\\usepackage\[(\d+(?:\.\d+)?(?:in|cm|mm|pt))(?:,\s*)?(\d+(?:\.\d+)?(?:in|cm|mm|pt))?\]\{geometry\}/g,
+        (match, m1, m2) => {
+          const opts = m2 ? `margin=${m1}, margin=${m2}` : `margin=${m1}`;
+          return `\\usepackage[${opts}]{geometry}`;
+        },
+      );
+      return fixed;
     }
 
     /** Read .toc file hash to detect if a second pass is actually needed */
