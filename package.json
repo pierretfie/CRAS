@@ -1,6 +1,6 @@
 {
   "name": "cras",
-  "version": "1.0.19",
+  "version": "1.0.20",
   "description": "CRAS - Conversion Rate Analytics System",
   "author": "CRAS Team <dev@cras.app>",
   "main": "dist-electron/main.js",
