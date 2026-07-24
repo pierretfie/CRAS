@@ -143,9 +143,9 @@ function AuthPage() {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="signin">
-              <TabsList className="grid grid-cols-2 w-full mb-4">
-                <TabsTrigger value="signin">Sign In</TabsTrigger>
-                <TabsTrigger value="register">Register</TabsTrigger>
+              <TabsList className="w-full mb-4">
+                <TabsTrigger value="signin" className="w-full">Sign In</TabsTrigger>
+                {/* <TabsTrigger value="register">Register</TabsTrigger> */}
               </TabsList>
 
               {/* ── Sign In ── */}
@@ -209,7 +209,7 @@ function AuthPage() {
                 )}
               </TabsContent>
 
-              {/* ── Register new workspace ── */}
+              {/* ── Register new workspace ── (hidden)
               <TabsContent value="register">
                 <form onSubmit={handleRegister} className="space-y-4">
 
@@ -269,6 +269,7 @@ function AuthPage() {
                   </Button>
                 </form>
               </TabsContent>
+              */}
             </Tabs>
           </CardContent>
         </Card>
