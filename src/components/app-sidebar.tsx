@@ -1,5 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Activity, Users, BarChart3, MessageSquareText, Shield, PlusCircle, Bell, BookOpen, Info, UserCircle, CalendarDays } from "lucide-react";
+import { useEffect, useState } from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -20,6 +21,14 @@ export function AppSidebar() {
   const { data } = useCurrentUser();
   const { toggle } = useAIDrawer();
   const path = useRouterState({ select: (r) => r.location.pathname });
+  const [version, setVersion] = useState<string>("");
+
+  useEffect(() => {
+    const api = (window as any).electronAPI;
+    if (api?.getVersion) {
+      api.getVersion().then((v: string) => setVersion(v)).catch(() => {});
+    }
+  }, []);
   const isActive = (url: string) =>
     url === "/clients"
       ? path === "/clients" || (path.startsWith("/clients/") && path !== "/clients/new")
@@ -110,6 +119,11 @@ export function AppSidebar() {
         )}
       </SidebarContent>
       <SidebarFooter>
+        {version && (
+          <div className="px-3 py-1 text-[10px] text-muted-foreground/50 text-center">
+            v{version}
+          </div>
+        )}
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton asChild isActive={path === "/profile"}>
