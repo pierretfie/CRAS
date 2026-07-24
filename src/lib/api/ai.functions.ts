@@ -627,7 +627,26 @@ export const compileLatexToPdf = createServerFn({ method: "POST" })
       tmpDir: string,
     ): Promise<{ success: boolean; pdf?: string; log?: string; fullLog?: string }> {
       const needsToc = tex.includes("\\tableofcontents") || tex.includes("\\ref{");
-      const baseCmd = "pdflatex -interaction=nonstopmode -halt-on-error --enable-installer";
+
+      // Find pdflatex — check PATH first, then common Windows locations
+      let pdflatex = "pdflatex";
+      try {
+        const whichCmd = process.platform === "win32" ? "where pdflatex" : "which pdflatex";
+        execSync(whichCmd, { stdio: "ignore" });
+      } catch {
+        // Not in PATH — check MiKTeX install dir on Windows
+        if (process.platform === "win32") {
+          const miktexBin = "C:\\Program Files\\MiKTeX\\miktex\\bin\\x64";
+          const miktexPdflatex = join(miktexBin, "pdflatex.exe");
+          if (existsSync(miktexPdflatex)) {
+            pdflatex = miktexPdflatex;
+            // Add to PATH so child processes can find other MiKTeX tools
+            process.env.PATH = miktexBin + ";" + (process.env.PATH || "");
+          }
+        }
+      }
+
+      const baseCmd = `"${pdflatex}" -interaction=nonstopmode -halt-on-error --enable-installer`;
 
       try {
         // Diagnostic: catch corruption between extraction and compilation —
