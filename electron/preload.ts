@@ -21,4 +21,5 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("update:progress", (_, data) => cb(data)),
   updateLater: () => ipcRenderer.send("update:later"),
   updateRestart: () => ipcRenderer.send("update:restart"),
+  updateSkip: () => ipcRenderer.send("update:skip"),
 });

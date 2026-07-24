@@ -4,9 +4,10 @@ import { mkdirSync, existsSync, cpSync, rmSync } from "node:fs";
 const outdir = "release/server-single";
 if (!existsSync(outdir)) mkdirSync(outdir, { recursive: true });
 
-// Copy client assets from Nitro output to release/public/
+// Clean stale client assets before copying
 const publicDir = "release/public";
-if (!existsSync(publicDir)) mkdirSync(publicDir, { recursive: true });
+if (existsSync(publicDir)) rmSync(publicDir, { recursive: true });
+mkdirSync(publicDir, { recursive: true });
 cpSync(".output/public", publicDir, { recursive: true });
 console.log(`Copied client assets → ${publicDir}/`);
 

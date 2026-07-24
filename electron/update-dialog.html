@@ -111,6 +111,12 @@
     color: white;
   }
   .btn-primary:hover { filter: brightness(1.1); }
+  .btn-skip {
+    background: transparent;
+    color: #e74c3c;
+    border: 1px solid rgba(231, 76, 60, 0.3);
+  }
+  .btn-skip:hover { background: rgba(231, 76, 60, 0.1); }
   .btn-primary:disabled {
     opacity: 0.5;
     cursor: not-allowed;
@@ -139,7 +145,8 @@
   </div>
 
   <div class="buttons">
-    <button class="btn btn-secondary" id="btn-later">Later</button>
+    <button class="btn btn-skip" id="btn-skip">Skip this version</button>
+    <button class="btn btn-secondary" id="btn-later" style="display:none">Later</button>
     <button class="btn btn-primary" id="btn-restart" disabled>Restart &amp; Install</button>
   </div>
 </div>
@@ -152,6 +159,7 @@
   var progressFill = document.getElementById('progress-fill');
   var btnRestart = document.getElementById('btn-restart');
   var btnLater = document.getElementById('btn-later');
+  var btnSkip = document.getElementById('btn-skip');
 
   function setupAPI() {
     if (!window.electronAPI) {
@@ -165,6 +173,8 @@
         descEl.textContent = 'Update downloaded and ready to install.';
         progressEl.classList.remove('active');
         btnRestart.disabled = false;
+        btnSkip.style.display = 'none';
+        btnLater.style.display = 'inline-block';
         btnLater.textContent = 'Close';
       }
     });
@@ -187,6 +197,10 @@
     btnLater.addEventListener('click', function(e) {
       e.preventDefault();
       window.electronAPI.updateLater();
+    });
+    btnSkip.addEventListener('click', function(e) {
+      e.preventDefault();
+      window.electronAPI.updateSkip();
     });
   }
 
