@@ -627,7 +627,7 @@ export const compileLatexToPdf = createServerFn({ method: "POST" })
       tmpDir: string,
     ): Promise<{ success: boolean; pdf?: string; log?: string; fullLog?: string }> {
       const needsToc = tex.includes("\\tableofcontents") || tex.includes("\\ref{");
-      const baseCmd = "pdflatex -interaction=nonstopmode -halt-on-error";
+      const baseCmd = "pdflatex -interaction=nonstopmode -halt-on-error --enable-installer";
 
       try {
         // Diagnostic: catch corruption between extraction and compilation —
