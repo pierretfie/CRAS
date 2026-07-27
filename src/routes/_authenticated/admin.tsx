@@ -60,7 +60,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Send, Bot, User, ShieldAlert, Loader2, FileText, Copy, Square, Pencil, ShieldCheck, ShieldOff, RotateCcw, Brain, ChevronDown, ChevronRight, Building2, Globe, Phone, MapPin, Briefcase, Save } from "lucide-react";
+import { Plus, Trash2, Send, Bot, User, ShieldAlert, Loader2, FileText, Copy, Square, Pencil, Check, X, ShieldCheck, ShieldOff, RotateCcw, Brain, ChevronDown, ChevronRight, Building2, Globe, Phone, MapPin, Briefcase, Save } from "lucide-react";
 import { toast } from "sonner";
 import { useAnalyticsData } from "@/hooks/use-analytics-data";
 import { Markdown } from "@/components/markdown";
@@ -598,6 +598,8 @@ function CategoriesTab() {
     enabled: !!companyId,
   });
   const [name, setName] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
 
   async function add() {
     if (!name.trim()) return;
@@ -610,6 +612,19 @@ function CategoriesTab() {
     } catch (err: any) {
       console.error(err);
       toast.error(err.message ?? "Failed to add category");
+    }
+  }
+
+  async function update(id: string) {
+    if (!editName.trim()) return;
+    try {
+      const res = await query('UPDATE admin_categories SET name = $1 WHERE id = $2', [editName.trim(), id]);
+      if (res.error) throw res.error;
+      setEditingId(null);
+      qc.invalidateQueries({ queryKey: ["admin_categories", companyId] });
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message ?? "Failed to update category");
     }
   }
 
@@ -636,8 +651,27 @@ function CategoriesTab() {
         <div className="space-y-1">
           {cats?.map((c: any) => (
             <div key={c.id} className="flex items-center justify-between border-b border-border pb-1">
-              <span>{c.name}</span>
-              <Button size="icon" variant="ghost" onClick={() => del(c.id)}><Trash2 className="h-4 w-4" /></Button>
+              {editingId === c.id ? (
+                <>
+                  <Input
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") update(c.id); if (e.key === "Escape") setEditingId(null); }}
+                    className="h-8 flex-1 mr-2"
+                    autoFocus
+                  />
+                  <Button size="icon" variant="ghost" onClick={() => update(c.id)}><Check className="h-4 w-4 text-green-600" /></Button>
+                  <Button size="icon" variant="ghost" onClick={() => setEditingId(null)}><X className="h-4 w-4" /></Button>
+                </>
+              ) : (
+                <>
+                  <span>{c.name}</span>
+                  <div className="flex gap-0">
+                    <Button size="icon" variant="ghost" onClick={() => { setEditingId(c.id); setEditName(c.name); }}><Pencil className="h-4 w-4" /></Button>
+                    <Button size="icon" variant="ghost" onClick={() => del(c.id)}><Trash2 className="h-4 w-4" /></Button>
+                  </div>
+                </>
+              )}
             </div>
           ))}
         </div>
@@ -654,6 +688,8 @@ function ProductsTab() {
     queryFn: async () => (await supabase.from("admin_products").select("*").order("name")).data ?? [],
   });
   const [name, setName] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
 
   async function add() {
     if (!name.trim()) return;
@@ -662,6 +698,12 @@ function ProductsTab() {
     const { error } = await supabase.from("admin_products").insert({ name: name.trim(), company_id: companyId });
     if (error) toast.error(error.message);
     else { setName(""); qc.invalidateQueries({ queryKey: ["admin_products"] }); }
+  }
+  async function update(id: string) {
+    if (!editName.trim()) return;
+    const { error } = await supabase.from("admin_products").update({ name: editName.trim() }).eq("id", id);
+    if (error) toast.error(error.message);
+    else { setEditingId(null); qc.invalidateQueries({ queryKey: ["admin_products"] }); }
   }
   async function del(id: string) {
     const { error } = await supabase.from("admin_products").delete().eq("id", id);
@@ -683,8 +725,27 @@ function ProductsTab() {
         <div className="space-y-1">
           {products?.map((p: { id: string; name: string }) => (
             <div key={p.id} className="flex items-center justify-between border-b border-border pb-1">
-              <span>{p.name}</span>
-              <Button size="icon" variant="ghost" onClick={() => del(p.id)}><Trash2 className="h-4 w-4" /></Button>
+              {editingId === p.id ? (
+                <>
+                  <Input
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") update(p.id); if (e.key === "Escape") setEditingId(null); }}
+                    className="h-8 flex-1 mr-2"
+                    autoFocus
+                  />
+                  <Button size="icon" variant="ghost" onClick={() => update(p.id)}><Check className="h-4 w-4 text-green-600" /></Button>
+                  <Button size="icon" variant="ghost" onClick={() => setEditingId(null)}><X className="h-4 w-4" /></Button>
+                </>
+              ) : (
+                <>
+                  <span>{p.name}</span>
+                  <div className="flex gap-0">
+                    <Button size="icon" variant="ghost" onClick={() => { setEditingId(p.id); setEditName(p.name); }}><Pencil className="h-4 w-4" /></Button>
+                    <Button size="icon" variant="ghost" onClick={() => del(p.id)}><Trash2 className="h-4 w-4" /></Button>
+                  </div>
+                </>
+              )}
             </div>
           ))}
           {products && products.length === 0 && (
@@ -742,7 +803,7 @@ function StagesTab() {
         if (res.error) throw res.error;
       }
       setDraft({});
-        qc.invalidateQueries({ queryKey: ["stage_config", companyId] });
+      qc.invalidateQueries({ queryKey: ["stage_config", companyId] });
       toast.success("Stages updated successfully");
     } catch (err: any) {
       console.error(err);
