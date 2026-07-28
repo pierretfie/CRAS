@@ -1,5 +1,5 @@
 import electronUpdater from "electron-updater";
-import { BrowserWindow, ipcMain } from "electron";
+import { BrowserWindow, ipcMain, dialog } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -9,6 +9,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const { autoUpdater } = electronUpdater;
+const isLinux = process.platform === "linux";
 
 autoUpdater.autoDownload = false;
 autoUpdater.autoInstallOnAppQuit = false;
@@ -135,6 +136,21 @@ export function initAutoUpdate(mainWindow: BrowserWindow): void {
     if (skippedVersions.has(info.version)) return;
 
     updateVersion = info.version;
+
+    // Linux: show native dialog, then download silently
+    if (isLinux) {
+      dialog.showMessageBox(mainWindowRef!, {
+        type: "info",
+        title: "Update Available",
+        message: `A new version (${info.version}) is available.`,
+        detail: "It will be downloaded in the background. You'll be prompted to install when it's ready.",
+        buttons: ["Ok"],
+      });
+      autoUpdater.downloadUpdate().catch(() => {});
+      return;
+    }
+
+    // Windows: show custom splash dialog
     const dlg = createUpdateDialog();
 
     dlg.webContents.on("did-finish-load", () => {
@@ -150,6 +166,8 @@ export function initAutoUpdate(mainWindow: BrowserWindow): void {
 
   autoUpdater.on("download-progress", (progress) => {
     const pct = Math.round(progress.percent);
+    // Linux: no progress dialog — runs silently in background
+    if (isLinux) return;
     sendToDialog("update:progress", {
       percent: pct,
       transferred: progress.transferred,
@@ -159,6 +177,20 @@ export function initAutoUpdate(mainWindow: BrowserWindow): void {
   });
 
   autoUpdater.on("update-downloaded", () => {
+    // Linux: prompt native dialog to restart
+    if (isLinux) {
+      dialog.showMessageBox(mainWindowRef!, {
+        type: "info",
+        title: "Update Ready",
+        message: "Update has been downloaded.",
+        detail: "The app will restart to install the update.",
+        buttons: ["Restart Now", "Later"],
+      }).then(({ response }) => {
+        if (response === 0) autoUpdater.quitAndInstall(false, true);
+      });
+      return;
+    }
+
     sendToDialog("update:info", {
       version: updateVersion,
       status: "downloaded",
