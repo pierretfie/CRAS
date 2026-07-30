@@ -585,7 +585,7 @@ function AnalyticsPage() {
                 <XAxis type="number" domain={[0, 100]} unit="%" tickLine={false} axisLine={false} tick={{ fill: C.axis, fontSize: 11 }} />
                 <YAxis type="category" dataKey="channel" width={120} tickLine={false} axisLine={false} tick={{ fill: C.white, fontSize: 11 }} />
                 <Tooltip
-                  contentStyle={{ background: C.tooltipBg, border: `1px solid ${C.tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
+                  contentStyle={{ background: C.tooltipBg, border: `1px solid ${C.tooltipBorder}`, borderRadius: 8, fontSize: 12, color: C.white }}
                   formatter={(_: any, __: any, entry: any) => {
                     const p = entry.payload;
                     return [`${p.ratePct}% — ${p.won} won of ${p.total} total`, "Win Rate"];
@@ -648,7 +648,7 @@ function AnalyticsPage() {
                       <YAxis type="category" dataKey="type" width={120} tickLine={false} axisLine={false} tick={{ fill: C.white, fontSize: 11 }}
                         tickFormatter={(v: string) => ACTIVITY_LABEL[v] ?? v} />
                       <Tooltip
-                        contentStyle={{ background: C.tooltipBg, border: `1px solid ${C.tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
+                        contentStyle={{ background: C.tooltipBg, border: `1px solid ${C.tooltipBorder}`, borderRadius: 8, fontSize: 12, color: C.white }}
                         formatter={(value: any) => [value, "activities"]}
                         labelFormatter={(v: any) => ACTIVITY_LABEL[v] ?? v}
                       />
@@ -686,7 +686,7 @@ function AnalyticsPage() {
                       <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: C.axis, fontSize: 11 }} />
                       <YAxis type="category" dataKey="name" width={110} tickLine={false} axisLine={false} tick={{ fill: C.white, fontSize: 11 }} />
                       <Tooltip
-                        contentStyle={{ background: C.tooltipBg, border: `1px solid ${C.tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
+                        contentStyle={{ background: C.tooltipBg, border: `1px solid ${C.tooltipBorder}`, borderRadius: 8, fontSize: 12, color: C.white }}
                         formatter={(_: any, __: any, entry: any) => {
                           const top = Object.entries(entry.payload.breakdown as Record<string, number>)
                             .sort((a, b) => b[1] - a[1]).slice(0, 3)
@@ -715,7 +715,7 @@ function AnalyticsPage() {
                       <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: C.axis, fontSize: 10 }} interval={2} />
                       <YAxis allowDecimals={false} tickLine={false} axisLine={false} width={24} tick={{ fill: C.axis, fontSize: 11 }} />
                       <Tooltip
-                        contentStyle={{ background: C.tooltipBg, border: `1px solid ${C.tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
+                        contentStyle={{ background: C.tooltipBg, border: `1px solid ${C.tooltipBorder}`, borderRadius: 8, fontSize: 12, color: C.white }}
                         formatter={(value: any, name?: any) => [value, name === "stage" ? "Stage updates" : "Follow-up check-ins"]}
                       />
                       <Bar dataKey="stage" stackId="a" fill={C.blue} name="stage" radius={[0, 0, 0, 0]} maxBarSize={20} />
@@ -799,7 +799,7 @@ function AnalyticsPage() {
                     <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: C.axis, fontSize: 11 }} />
                     <YAxis type="category" dataKey="stage" width={56} tickLine={false} axisLine={false} tick={{ fill: C.white, fontSize: 11 }} />
                     <Tooltip
-                      contentStyle={{ background: C.tooltipBg, border: `1px solid ${C.tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
+                      contentStyle={{ background: C.tooltipBg, border: `1px solid ${C.tooltipBorder}`, borderRadius: 8, fontSize: 12, color: C.white }}
                       formatter={(value: any, name?: any) => [value, name === "withFollowUp" ? "With follow-up" : "Without"]}
                     />
                     <Bar dataKey="withFollowUp" stackId="a" fill={C.green} name="withFollowUp" radius={[0, 0, 0, 0]} maxBarSize={22}>
@@ -959,7 +959,7 @@ function AnalyticsPage() {
                   <XAxis type="number" domain={[0, 10]} allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: C.axis, fontSize: 11 }} />
                   <YAxis type="category" dataKey="product" width={108} tickLine={false} axisLine={false} tick={{ fill: C.white, fontSize: 11 }} />
                   <Tooltip
-                    contentStyle={{ background: C.tooltipBg, border: `1px solid ${C.tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
+                    contentStyle={{ background: C.tooltipBg, border: `1px solid ${C.tooltipBorder}`, borderRadius: 8, fontSize: 12, color: C.white }}
                     formatter={(value: any, _: any, entry: any) => [
                       `${(value as number).toFixed(1)} avg (${entry.payload.count} clients)`,
                       "Interest",
@@ -1125,7 +1125,7 @@ function AnalyticsPage() {
                       width={28}
                     />
                     <Tooltip
-                      contentStyle={{ background: C.tooltipBg, border: `1px solid ${C.tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
+                      contentStyle={{ background: C.tooltipBg, border: `1px solid ${C.tooltipBorder}`, borderRadius: 8, fontSize: 12, color: C.white }}
                       formatter={(value: any, name: string | number | undefined, item: any) => {
                         const isWon = name === "won";
                         const n = isWon ? item.payload.wonN : item.payload.lostN;
@@ -1454,7 +1454,7 @@ function SalesCycleLengthCard({
                   tick={{ fill: C.white, fontSize: 11 }}
                 />
                 <Tooltip
-                  contentStyle={{ background: C.tooltipBg, border: `1px solid ${C.tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
+                  contentStyle={{ background: C.tooltipBg, border: `1px solid ${C.tooltipBorder}`, borderRadius: 8, fontSize: 12, color: C.white }}
                   formatter={(value: any, _: any, entry: any) => [
                     `${(value as number).toFixed(0)}d avg (${entry.payload.deals} ${entry.payload.deals === 1 ? "deal" : "deals"})`,
                     "Cycle",
@@ -1778,7 +1778,7 @@ function StageConversionCard({
               tick={{ fill: C.white, fontSize: 11 }}
             />
             <Tooltip
-              contentStyle={{ background: C.tooltipBg, border: `1px solid ${C.tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
+              contentStyle={{ background: C.tooltipBg, border: `1px solid ${C.tooltipBorder}`, borderRadius: 8, fontSize: 12, color: C.white }}
               formatter={(_: any, __: any, entry: any) => {
                 const p = entry.payload;
                 return [
@@ -1879,7 +1879,7 @@ function ProductBarChart({
         <XAxis type="number" allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: C.axis, fontSize: 11 }} />
         <YAxis type="category" dataKey="name" width={108} tickLine={false} axisLine={false} tick={{ fill: C.white, fontSize: 11 }} />
         <Tooltip
-          contentStyle={{ background: C.tooltipBg, border: `1px solid ${C.tooltipBorder}`, borderRadius: 8, fontSize: 12 }}
+          contentStyle={{ background: C.tooltipBg, border: `1px solid ${C.tooltipBorder}`, borderRadius: 8, fontSize: 12, color: C.white }}
           cursor={{ fill: "rgba(255,255,255,0.04)" }}
           formatter={(value: any, _: any, entry: any) => [
             `${value} (${entry.payload.pct}%)`,
