@@ -590,6 +590,7 @@ function EditClientDialog({ client, onSaved }: { client: { id: string; name: str
 }
 
 function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_stage: number; interest_scale: number | null }; onSaved: () => void }) {
+  const { data: me } = useCurrentUser();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"progress" | "won" | "lost">("progress");
   const [toStage, setToStage] = useState(client.current_stage);
