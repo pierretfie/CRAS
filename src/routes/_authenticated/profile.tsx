@@ -7,6 +7,7 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
@@ -225,9 +226,8 @@ function ProfilePage() {
         <CardContent className="space-y-4">
           <div className="space-y-1.5">
             <Label htmlFor="current-pwd">Current password</Label>
-            <Input
+            <PasswordInput
               id="current-pwd"
-              type="password"
               value={currentPwd}
               onChange={(e) => setCurrentPwd(e.target.value)}
               placeholder="Your current password"
@@ -236,9 +236,8 @@ function ProfilePage() {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="new-pwd">New password</Label>
-            <Input
+            <PasswordInput
               id="new-pwd"
-              type="password"
               value={newPwd}
               onChange={(e) => setNewPwd(e.target.value)}
               placeholder="At least 6 characters"
@@ -247,9 +246,8 @@ function ProfilePage() {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="confirm-pwd">Confirm new password</Label>
-            <Input
+            <PasswordInput
               id="confirm-pwd"
-              type="password"
               value={confirmPwd}
               onChange={(e) => setConfirmPwd(e.target.value)}
               placeholder="Repeat new password"

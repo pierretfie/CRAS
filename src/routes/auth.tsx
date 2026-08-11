@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -149,7 +150,7 @@ function AuthPage() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="signin-password">Password</Label>
-                      <Input id="signin-password" name="password" type="password" autoComplete="current-password" required />
+                      <PasswordInput id="signin-password" name="password" autoComplete="current-password" required />
                     </div>
                     <Button className="w-full" type="submit" disabled={loading}>
                       {loading ? "Signing in…" : "Sign In"}
