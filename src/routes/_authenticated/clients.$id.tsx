@@ -50,6 +50,9 @@ const ACTIVITY_TYPES = [
   { value: "website_form",   label: "🌐 Website Form" },
   { value: "referral_intro", label: "🔗 Referral Introduction" },
 ];
+const ACTIVITY_LABEL: Record<string, string> = Object.fromEntries(
+  ACTIVITY_TYPES.map(t => [t.value, t.label])
+);
 
 function ClientDetail() {
   const { id } = Route.useParams();
@@ -963,6 +966,7 @@ function FollowUpSection({ clientId, clientStatus, reloadTrigger }: { clientId: 
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   // Per follow-up activity type selection before logging
   const [pendingActivity, setPendingActivity] = useState<Record<string, string>>({});
+  const [pendingNote, setPendingNote] = useState<Record<string, string>>({});
   // last_logged_at per follow-up id — derived from follow_up_logs, updated optimistically on log
   const [lastLoggedAt, setLastLoggedAt] = useState<Record<string, string | null>>({});
 
@@ -1014,11 +1018,13 @@ function FollowUpSection({ clientId, clientStatus, reloadTrigger }: { clientId: 
     }
     await withLoading(followUp.id, async () => {
       const { logFollowUp } = await import("@/lib/follow-ups");
-      const updated = await logFollowUp(followUp, pendingActivity[followUp.id]);
+      const note = pendingNote[followUp.id]?.trim() || null;
+      const updated = await logFollowUp(followUp, pendingActivity[followUp.id], note);
       const now = new Date().toISOString();
       setFollowUps(prev => prev.map(f => f.id === followUp.id ? { ...f, next_reminder: updated.next_reminder } : f));
       setLastLoggedAt(prev => ({ ...prev, [followUp.id]: now }));
       setPendingActivity(prev => { const n = { ...prev }; delete n[followUp.id]; return n; });
+      setPendingNote(prev => { const n = { ...prev }; delete n[followUp.id]; return n; });
       // Refresh log list
       const { getFollowUpLogs } = await import("@/lib/follow-ups");
       setLogs(await getFollowUpLogs(clientId));
@@ -1171,6 +1177,16 @@ function FollowUpSection({ clientId, clientStatus, reloadTrigger }: { clientId: 
                           </button>
                         ))}
                       </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-green-400">What happened? <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                        <Textarea
+                          rows={2}
+                          className="text-xs"
+                          placeholder="Describe the outcome, key points, next steps…"
+                          value={pendingNote[f.id] ?? ""}
+                          onChange={(e) => setPendingNote(prev => ({ ...prev, [f.id]: e.target.value }))}
+                        />
+                      </div>
                       <div className="flex gap-1.5">
                         <Button
                           size="sm"
@@ -1241,16 +1257,23 @@ function FollowUpSection({ clientId, clientStatus, reloadTrigger }: { clientId: 
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Contact history</p>
             <div className="space-y-1 max-h-48 overflow-y-auto">
               {logs.map(log => (
-                <div key={log.id} className="flex items-center gap-2 py-1 border-b border-border last:border-0">
-                  <span className="h-1.5 w-1.5 rounded-full bg-stage-3 shrink-0" />
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(log.logged_at).toLocaleDateString(undefined, {
-                      weekday: "short", month: "short", day: "numeric",
-                    })}
-                  </span>
-                  {log.note && (
-                    <span className="text-xs text-muted-foreground italic truncate">— {log.note}</span>
-                  )}
+                <div key={log.id} className="flex items-start gap-2 py-1.5 border-b border-border last:border-0">
+                  <span className="h-1.5 w-1.5 rounded-full bg-stage-3 shrink-0 mt-1.5" />
+                  <div className="space-y-0.5 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(log.logged_at).toLocaleDateString(undefined, {
+                          weekday: "short", month: "short", day: "numeric",
+                        })}
+                      </span>
+                      {log.activity_type && (
+                        <span className="text-xs font-medium text-foreground">{ACTIVITY_LABEL[log.activity_type] ?? log.activity_type}</span>
+                      )}
+                    </div>
+                    {log.note && (
+                      <p className="text-xs text-muted-foreground italic">{log.note}</p>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

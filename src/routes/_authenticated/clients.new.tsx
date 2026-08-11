@@ -255,8 +255,8 @@ function NewClient() {
         <CardHeader><CardTitle>Contact</CardTitle></CardHeader>
         <CardContent className="grid md:grid-cols-2 gap-4">
           <Field label="Client Name *"><Input value={form.name} onChange={(e) => set("name", e.target.value)} /></Field>
-          <Field label="Email"><Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} /></Field>
-          <Field label="Location"><Input value={form.location} onChange={(e) => set("location", e.target.value)} /></Field>
+          <Field label="Email"><Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} placeholder="Optional" /></Field>
+          <Field label="Location"><Input value={form.location} onChange={(e) => set("location", e.target.value)} placeholder="Optional" /></Field>
           <Field label="Contact Person"><Input value={form.contact_person} onChange={(e) => set("contact_person", e.target.value)} placeholder="Name" /></Field>
           <Field label="Contact Person Email"><Input type="email" value={form.contact_person_email} onChange={(e) => set("contact_person_email", e.target.value)} placeholder="Optional" /></Field>
           <Field label="Contact Person Phone"><Input type="tel" value={form.contact_person_phone} onChange={(e) => set("contact_person_phone", e.target.value)} placeholder="Optional" /></Field>

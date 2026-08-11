@@ -135,7 +135,7 @@ export async function createFollowUp(
  * "Followed up today" — logs the contact and reschedules next_reminder
  * based on the follow-up's frequency. The follow-up stays active.
  */
-export async function logFollowUp(followUp: FollowUp, activityType?: string | null): Promise<FollowUp> {
+export async function logFollowUp(followUp: FollowUp, activityType?: string | null, note?: string | null): Promise<FollowUp> {
   const nextReminder = computeNextReminder(
     followUp.frequency,
     followUp.custom_interval_days ?? undefined
@@ -147,6 +147,7 @@ export async function logFollowUp(followUp: FollowUp, activityType?: string | nu
     client_id: followUp.client_id,
     user_id: followUp.user_id,
     activity_type: activityType ?? null,
+    note: note || null,
     logged_at: new Date().toISOString(),
   });
   if (logError) throw logError;
