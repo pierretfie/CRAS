@@ -62,18 +62,21 @@ export type Database = {
           id: string
           name: string
           company_id: string
+          pinned_to_sidebar: boolean
         }
         Insert: {
           created_at?: string
           id?: string
           name: string
           company_id: string
+          pinned_to_sidebar?: boolean
         }
         Update: {
           created_at?: string
           id?: string
           name?: string
           company_id?: string
+          pinned_to_sidebar?: boolean
         }
         Relationships: [
           {

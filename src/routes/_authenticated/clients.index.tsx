@@ -14,7 +14,14 @@ import { DataScopeToggle } from "@/components/data-scope-toggle";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { DatePicker } from "@/components/ui/date-picker";
 
+type ClientsSearch = {
+  category?: string;
+};
+
 export const Route = createFileRoute("/_authenticated/clients/")({
+  validateSearch: (search: Record<string, unknown>): ClientsSearch => ({
+    category: typeof search.category === "string" ? search.category : undefined,
+  }),
   component: ClientsList,
 });
 
@@ -22,6 +29,7 @@ function ClientsList() {
   const { effectiveUserId } = useDataScope();
   const { data: me } = useCurrentUser();
   const companyId = me?.company?.id;
+  const { category: urlCategory } = Route.useSearch();
   const [q, setQ] = useState("");
   const [status, setStatus] = useState<"all" | "active" | "won" | "lost">("all");
 
@@ -91,7 +99,7 @@ function ClientsList() {
 
   const [productFilter, setProductFilter] = useState("all");
   const [repFilter, setRepFilter] = useState("all");
-  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState(urlCategory ?? "all");
   const [sortBy, setSortBy] = useState<"newest" | "oldest">("newest");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");

@@ -1,6 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Activity, Users, BarChart3, MessageSquareText, Shield, PlusCircle, Bell, BookOpen, Info, UserCircle, CalendarDays } from "lucide-react";
+import { Activity, Users, BarChart3, MessageSquareText, Shield, PlusCircle, Bell, BookOpen, Info, UserCircle, CalendarDays, Folder } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Sidebar,
   SidebarContent,
@@ -14,6 +15,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { query } from "@/lib/db";
 
 import { useAIDrawer } from "@/hooks/use-ai-drawer";
 
@@ -22,6 +24,19 @@ export function AppSidebar() {
   const { toggle } = useAIDrawer();
   const path = useRouterState({ select: (r) => r.location.pathname });
   const [version, setVersion] = useState<string>("");
+
+  const companyId = data?.company?.id;
+
+  const { data: pinnedCategories } = useQuery({
+    queryKey: ["pinned_categories", companyId],
+    queryFn: async () => {
+      if (!companyId) return [];
+      const res = await query('SELECT id, name FROM admin_categories WHERE company_id = $1 AND pinned_to_sidebar = true ORDER BY name', [companyId]);
+      if (res.error) throw res.error;
+      return res.data as { id: string; name: string }[];
+    },
+    enabled: !!companyId,
+  });
 
   useEffect(() => {
     const api = (window as any).electronAPI;
@@ -103,6 +118,26 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {pinnedCategories && pinnedCategories.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Categories</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {pinnedCategories.map((cat) => (
+                  <SidebarMenuItem key={cat.id}>
+                    <SidebarMenuButton asChild isActive={path === "/clients" && new URLSearchParams(window.location.search).get("category") === cat.name}>
+                      <Link to="/clients" search={{ category: cat.name }}>
+                        <Folder className="h-4 w-4" />
+                        <span>{cat.name}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
 
         {data?.isAdmin && (
           <SidebarGroup>
