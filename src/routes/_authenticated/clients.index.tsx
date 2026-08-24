@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useDataScope } from "@/contexts/data-scope-context";
 import { DataScopeToggle } from "@/components/data-scope-toggle";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { DatePicker } from "@/components/ui/date-picker";
 
 export const Route = createFileRoute("/_authenticated/clients/")({
   component: ClientsList,
@@ -211,8 +212,8 @@ function ClientsList() {
             <SelectItem value="oldest">Oldest first</SelectItem>
           </SelectContent>
         </Select>
-        <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-[150px]" placeholder="From" />
-        <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-[150px]" placeholder="To" />
+        <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="From" />
+        <DatePicker value={dateTo} onChange={setDateTo} placeholder="To" />
         {reps.length > 1 && (
           <Select value={repFilter} onValueChange={setRepFilter}>
             <SelectTrigger className="w-[160px]"><SelectValue placeholder="All reps" /></SelectTrigger>
