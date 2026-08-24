@@ -621,11 +621,22 @@ function Detail({ k, v }: { k: string; v: string | null | undefined }) {
   );
 }
 
-function EditClientDialog({ client, onSaved }: { client: { id: string; name: string; email: string | null; location: string | null; contact_person: string | null; contact_person_phone: string | null; contact_person_email: string | null; contact_person_role: string | null; product: string | null; interest_scale: number | null; parent_client_id: string | null }; onSaved: () => void }) {
+function EditClientDialog({ client, onSaved }: { client: { id: string; name: string; email: string | null; location: string | null; contact_person: string | null; contact_person_phone: string | null; contact_person_email: string | null; contact_person_role: string | null; product: string | null; interest_scale: number | null; parent_client_id: string | null; category: string }; onSaved: () => void }) {
   const [open, setOpen] = useState(false);
+  const { data: me } = useCurrentUser();
   const { data: products } = useQuery({
     queryKey: ["admin_products"],
     queryFn: async () => (await supabase.from("admin_products").select("*").order("name")).data ?? [],
+  });
+  const { data: categories } = useQuery({
+    queryKey: ["admin_categories", me?.company?.id],
+    queryFn: async () => {
+      if (!me?.company?.id) return [];
+      const res = await query('SELECT * FROM admin_categories WHERE company_id = $1 ORDER BY name', [me.company.id]);
+      if (res.error) throw res.error;
+      return res.data;
+    },
+    enabled: !!me?.company?.id && open,
   });
   const [form, setForm] = useState({
     name: client.name,
@@ -636,6 +647,8 @@ function EditClientDialog({ client, onSaved }: { client: { id: string; name: str
     contact_person_email: client.contact_person_email ?? "",
     contact_person_role: client.contact_person_role ?? "",
     product: client.product ?? "",
+    category: client.category ?? "",
+    customCategory: "",
   });
   const [interestScale, setInterestScale] = useState(Number(client.interest_scale ?? 5));
   const [saving, setSaving] = useState(false);
@@ -651,6 +664,7 @@ function EditClientDialog({ client, onSaved }: { client: { id: string; name: str
       contact_person_email: form.contact_person_email || null,
       contact_person_role: form.contact_person_role || null,
       product: form.product || null,
+      category: form.customCategory.trim() || form.category || client.category,
       interest_scale: interestScale,
     }).eq("id", client.id);
     setSaving(false);
@@ -675,6 +689,17 @@ function EditClientDialog({ client, onSaved }: { client: { id: string; name: str
           <div className="space-y-1"><Label>Contact Phone</Label><Input value={form.contact_person_phone} onChange={(e) => setForm({ ...form, contact_person_phone: e.target.value })} /></div>
           <div className="space-y-1"><Label>Contact Email</Label><Input value={form.contact_person_email} onChange={(e) => setForm({ ...form, contact_person_email: e.target.value })} /></div>
           <div className="space-y-1"><Label>Contact Role</Label><Input value={form.contact_person_role} onChange={(e) => setForm({ ...form, contact_person_role: e.target.value })} /></div>
+          <div className="space-y-1">
+            <Label>Category</Label>
+            <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v === "__clear__" ? "" : v })}>
+              <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+              <SelectContent>
+                {form.category && <SelectItem value="__clear__" className="text-muted-foreground italic">Clear selection</SelectItem>}
+                {categories?.map((c: any) => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Input className="mt-1" placeholder="Or type custom category" value={form.customCategory} onChange={(e) => setForm({ ...form, customCategory: e.target.value })} />
+          </div>
           <div className="space-y-1">
             <Label>Product</Label>
             <Select value={form.product} onValueChange={(v) => setForm({ ...form, product: v === "__clear__" ? "" : v })}>

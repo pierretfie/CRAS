@@ -90,6 +90,21 @@ function ClientsList() {
 
   const [productFilter, setProductFilter] = useState("all");
   const [repFilter, setRepFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [sortBy, setSortBy] = useState<"newest" | "oldest">("newest");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+
+  const { data: categories } = useQuery({
+    queryKey: ["admin_categories", companyId],
+    queryFn: async () => {
+      if (!companyId) return [];
+      const res = await query('SELECT * FROM admin_categories WHERE company_id = $1 ORDER BY name', [companyId]);
+      if (res.error) throw res.error;
+      return res.data;
+    },
+    enabled: !!companyId,
+  });
 
   // Build unique rep list from loaded clients
   const reps = useMemo(() => {
@@ -110,6 +125,22 @@ function ClientsList() {
         return false;
       }
     }
+    if (categoryFilter !== "all") {
+      if (categoryFilter === "__unspecified__") {
+        if (c.category != null && c.category !== "") return false;
+      } else if (c.category !== categoryFilter) {
+        return false;
+      }
+    }
+    if (dateFrom) {
+      const from = new Date(dateFrom);
+      if (new Date(c.created_at) < from) return false;
+    }
+    if (dateTo) {
+      const to = new Date(dateTo);
+      to.setHours(23, 59, 59, 999);
+      if (new Date(c.created_at) > to) return false;
+    }
     if (!q.trim()) return true;
     const t = q.toLowerCase();
     return (
@@ -119,6 +150,9 @@ function ClientsList() {
       (c.contact_person ?? "").toLowerCase().includes(t) ||
       (c.created_by_name ?? "").toLowerCase().includes(t)
     );
+  }).sort((a: any, b: any) => {
+    if (sortBy === "newest") return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
   });
 
   return (
@@ -160,6 +194,25 @@ function ClientsList() {
             ))}
           </SelectContent>
         </Select>
+        <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v)}>
+          <SelectTrigger className="w-[160px]"><SelectValue placeholder="All categories" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All categories</SelectItem>
+            <SelectItem value="__unspecified__">Unspecified</SelectItem>
+            {categories?.map((c: any) => (
+              <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
+          <SelectTrigger className="w-[140px]"><SelectValue placeholder="Sort by" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="newest">Newest first</SelectItem>
+            <SelectItem value="oldest">Oldest first</SelectItem>
+          </SelectContent>
+        </Select>
+        <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="w-[150px]" placeholder="From" />
+        <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="w-[150px]" placeholder="To" />
         {reps.length > 1 && (
           <Select value={repFilter} onValueChange={setRepFilter}>
             <SelectTrigger className="w-[160px]"><SelectValue placeholder="All reps" /></SelectTrigger>
