@@ -126,8 +126,8 @@ export function AppSidebar() {
               <SidebarMenu>
                 {pinnedCategories.map((cat) => (
                   <SidebarMenuItem key={cat.id}>
-                    <SidebarMenuButton asChild isActive={path === "/clients" && new URLSearchParams(window.location.search).get("category") === cat.name}>
-                      <Link to="/clients" search={{ category: cat.name }}>
+                    <SidebarMenuButton asChild isActive={path === `/categories/${cat.id}`}>
+                      <Link to="/categories/$id" params={{ id: cat.id }}>
                         <Folder className="h-4 w-4" />
                         <span>{cat.name}</span>
                       </Link>
