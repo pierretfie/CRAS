@@ -34,7 +34,7 @@ function ClientsList() {
         const sql = `SELECT c.*, p.name AS created_by_name, p.department AS created_by_dept
            FROM clients c
            LEFT JOIN profiles p ON p.id = c.created_by
-           WHERE c.company_id = $1
+           WHERE c.company_id = $1 AND c.parent_client_id IS NULL
            ORDER BY c.updated_at DESC`;
         const res = await query(sql, [companyId]);
         if (res.error) throw res.error;
@@ -66,7 +66,7 @@ function ClientsList() {
       const sql = `SELECT c.*, p.name AS created_by_name, p.department AS created_by_dept
          FROM clients c
          LEFT JOIN profiles p ON p.id = c.created_by
-         WHERE c.id = ANY($1::uuid[]) AND c.company_id = $2
+         WHERE c.id = ANY($1::uuid[]) AND c.company_id = $2 AND c.parent_client_id IS NULL
          ORDER BY c.updated_at DESC`;
 
       const res = await query(sql, [clientIds, companyId]);

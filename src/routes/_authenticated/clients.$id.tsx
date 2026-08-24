@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Edit, TrendingUp, XCircle, Trophy, Bell, Lock, ShieldAlert, Clock } from "lucide-react";
+import { ArrowLeft, Edit, TrendingUp, XCircle, Trophy, Bell, Lock, ShieldAlert, Clock, Plus, ChevronRight } from "lucide-react";
 import { InterestScaleSlider } from "@/components/interest-scale-slider";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
@@ -54,6 +54,99 @@ const ACTIVITY_LABEL: Record<string, string> = Object.fromEntries(
   ACTIVITY_TYPES.map(t => [t.value, t.label])
 );
 
+function SubClientsCard({ clientId, clientName, subClients, onAdded }: { clientId: string; clientName: string; subClients: any[]; onAdded: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ name: "", email: "", phone: "", location: "", company_name: "" });
+  const qc = useQueryClient();
+
+  async function addClient() {
+    if (!form.name.trim()) return toast.error("Name required");
+    setSaving(true);
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) { setSaving(false); return toast.error("Not signed in"); }
+
+    const { data: meData } = await supabase.from("profiles").select("company_id").eq("id", u.user.id).single();
+    const companyId = (meData as any)?.company_id;
+
+    const { error } = await supabase.from("clients").insert({
+      name: form.name.trim(),
+      email: form.email.trim() || null,
+      location: form.location.trim() || null,
+      contact_person_phone: form.phone.trim() || null,
+      contact_person: form.company_name.trim() || null,
+      category: "Other",
+      mode_of_connection: "referral_intro",
+      parent_client_id: clientId,
+      created_by: u.user.id,
+      company_id: companyId,
+    });
+    setSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success(`${form.name} added under ${clientName}`);
+    setForm({ name: "", email: "", phone: "", location: "", company_name: "" });
+    setOpen(false);
+    onAdded();
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between cursor-pointer" onClick={() => setExpanded(e => !e)}>
+        <div>
+          <CardTitle className="text-base flex items-center gap-2">
+            Clients under {clientName}
+            <Badge variant="secondary" className="text-xs">{subClients.length}</Badge>
+          </CardTitle>
+          <CardDescription>Brought or connected by this client</CardDescription>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button size="sm" onClick={(e) => { e.stopPropagation(); setOpen(true); }}><Plus className="h-4 w-4 mr-1" />Add Client</Button>
+          <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform ${expanded ? "rotate-90" : ""}`} />
+        </div>
+      </CardHeader>
+      {expanded && (
+        <CardContent>
+          {subClients.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No clients added yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {subClients.map((sc: any) => (
+                <div key={sc.id} className="flex items-center justify-between border-b border-border pb-2 last:border-0">
+                  <div className="flex items-center gap-2">
+                    <Link to="/clients/$id" params={{ id: sc.id }} className="font-medium text-foreground hover:underline">{sc.name}</Link>
+                    {sc.email && <span className="text-xs text-muted-foreground">{sc.email}</span>}
+                    {sc.location && <span className="text-xs text-muted-foreground">{sc.location}</span>}
+                  </div>
+                  <Badge variant={sc.status === "won" ? "default" : sc.status === "lost" ? "destructive" : "secondary"} className="text-xs">{sc.status}</Badge>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      )}
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Add client under {clientName}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1"><Label>Name *</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Client name" /></div>
+            <div className="space-y-1"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="Optional" /></div>
+            <div className="space-y-1"><Label>Phone</Label><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="Optional" /></div>
+            <div className="space-y-1"><Label>Location</Label><Input value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="Optional" /></div>
+            <div className="space-y-1"><Label>Company Name</Label><Input value={form.company_name} onChange={(e) => setForm({ ...form, company_name: e.target.value })} placeholder="Optional" /></div>
+          </div>
+          <DialogFooter>
+            <Button onClick={addClient} disabled={saving || !form.name.trim()}>{saving ? "Adding…" : "Add Client"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  );
+}
+
 function ClientDetail() {
   const { id } = Route.useParams();
   const qc = useQueryClient();
@@ -65,9 +158,11 @@ function ClientDetail() {
     queryFn: async () => {
       if (!me?.company?.id) return null;
       const res = await query(
-        `SELECT c.*, p.name AS created_by_name, p.department AS created_by_dept
+        `SELECT c.*, p.name AS created_by_name, p.department AS created_by_dept,
+                pc.name AS parent_client_name
          FROM clients c
          LEFT JOIN profiles p ON p.id = c.created_by
+         LEFT JOIN clients pc ON pc.id = c.parent_client_id
          WHERE c.id = $1 AND c.company_id = $2`,
         [id, me.company.id]
       );
@@ -91,6 +186,19 @@ function ClientDetail() {
       return res.data;
     },
     enabled: !!client,
+  });
+
+  const { data: subClients, refetch: refetchSubClients } = useQuery({
+    queryKey: ["sub-clients", id],
+    queryFn: async () => {
+      const res = await query(
+        `SELECT id, name, email, location, status FROM clients WHERE parent_client_id = $1 ORDER BY name`,
+        [id]
+      );
+      if (res.error) throw res.error;
+      return res.data;
+    },
+    enabled: !!id,
   });
 
   // Check access: owner, admin, or has an approved request
@@ -176,6 +284,9 @@ function ClientDetail() {
           {client.lost_reason && <Detail k="Lost Reason" v={client.lost_reason} />}
           <Detail k="Created" v={new Date(client.created_at).toLocaleDateString()} />
           <Detail k="Updated" v={new Date(client.updated_at).toLocaleDateString()} />
+          {(client as any).parent_client_name && (
+            <Detail k="Brought by" v={(client as any).parent_client_name} />
+          )}
           {client.created_by_name && (
             <div>
               <div className="text-xs text-muted-foreground">Added by</div>
@@ -186,6 +297,8 @@ function ClientDetail() {
           )}
         </CardContent>
       </Card>
+
+      <SubClientsCard clientId={client.id} clientName={client.name} subClients={subClients ?? []} onAdded={() => { refetchSubClients(); }} />
 
       {client.custom_fields && Object.keys(client.custom_fields as Record<string, string>).length > 0 && (
         <Card>
@@ -508,7 +621,7 @@ function Detail({ k, v }: { k: string; v: string | null | undefined }) {
   );
 }
 
-function EditClientDialog({ client, onSaved }: { client: { id: string; name: string; email: string | null; location: string | null; contact_person: string | null; contact_person_phone: string | null; contact_person_email: string | null; contact_person_role: string | null; product: string | null; interest_scale: number | null }; onSaved: () => void }) {
+function EditClientDialog({ client, onSaved }: { client: { id: string; name: string; email: string | null; location: string | null; contact_person: string | null; contact_person_phone: string | null; contact_person_email: string | null; contact_person_role: string | null; product: string | null; interest_scale: number | null; parent_client_id: string | null }; onSaved: () => void }) {
   const [open, setOpen] = useState(false);
   const { data: products } = useQuery({
     queryKey: ["admin_products"],
@@ -580,7 +693,7 @@ function EditClientDialog({ client, onSaved }: { client: { id: string; name: str
               onChange={(e) => setForm({ ...form, product: e.target.value })}
             />
           </div>
-          <div className="pt-1">
+           <div className="pt-1">
             <InterestScaleSlider value={interestScale} onChange={setInterestScale} />
           </div>
         </div>

@@ -21,6 +21,9 @@ import { Switch } from "@/components/ui/switch";
 import { createFollowUp } from "@/lib/follow-ups";
 
 export const Route = createFileRoute("/_authenticated/clients/new")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    parent: (search.parent as string) || undefined,
+  }),
   component: NewClient,
 });
 
@@ -51,6 +54,7 @@ const ACTIVITY_TYPES = [
 function NewClient() {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const { parent: parentClientId } = Route.useSearch();
   const [csvDrawerOpen, setCsvDrawerOpen] = useState(false);
   const { data: me } = useCurrentUser();
   const companyId = me?.company?.id;
@@ -173,6 +177,7 @@ function NewClient() {
         custom_fields: cf,
         interest_scale: interestScale,
         created_by: u.user.id,
+        parent_client_id: parentClientId || null,
       }).select("id").single();
 
       if (error || !client) {

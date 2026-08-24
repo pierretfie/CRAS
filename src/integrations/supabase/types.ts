@@ -372,6 +372,7 @@ export type Database = {
           lost_reason: string | null
           mode_of_connection: string
           name: string
+          parent_client_id: string | null
           product: string | null
           stage_label: string | null
           stage_notes: string | null
@@ -397,6 +398,7 @@ export type Database = {
           lost_reason?: string | null
           mode_of_connection: string
           name: string
+          parent_client_id?: string | null
           product?: string | null
           stage_label?: string | null
           stage_notes?: string | null
@@ -422,6 +424,7 @@ export type Database = {
           lost_reason?: string | null
           mode_of_connection?: string
           name?: string
+          parent_client_id?: string | null
           product?: string | null
           stage_label?: string | null
           stage_notes?: string | null
