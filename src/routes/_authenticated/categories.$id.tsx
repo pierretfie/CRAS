@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { query } from "@/lib/db";
 import { useState, useMemo } from "react";
@@ -17,6 +17,7 @@ export const Route = createFileRoute("/_authenticated/categories/$id")({
 
 function CategoryPage() {
   const { id } = Route.useParams();
+  const navigate = useNavigate();
   const { data: me } = useCurrentUser();
   const companyId = me?.company?.id;
   const [q, setQ] = useState("");
@@ -80,8 +81,8 @@ function CategoryPage() {
     <div className="max-w-6xl mx-auto space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/clients"><ArrowLeft className="h-4 w-4 mr-1" />Back</Link>
+          <Button variant="ghost" size="sm" onClick={() => navigate({ to: -1 as any })}>
+            <ArrowLeft className="h-4 w-4 mr-1" />Back
           </Button>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{categoryName}</h1>
