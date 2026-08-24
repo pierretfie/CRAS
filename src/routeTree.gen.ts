@@ -24,6 +24,7 @@ import { Route as AuthenticatedAboutRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedClientsIndexRouteImport } from './routes/_authenticated/clients.index'
 import { Route as AuthenticatedClientsNewRouteImport } from './routes/_authenticated/clients.new'
 import { Route as AuthenticatedClientsIdRouteImport } from './routes/_authenticated/clients.$id'
+import { Route as AuthenticatedCategoriesIdRouteImport } from './routes/_authenticated/categories.$id'
 
 const RunMigrationsRoute = RunMigrationsRouteImport.update({
   id: '/run-migrations',
@@ -100,6 +101,12 @@ const AuthenticatedClientsIdRoute = AuthenticatedClientsIdRouteImport.update({
   path: '/clients/$id',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedCategoriesIdRoute =
+  AuthenticatedCategoriesIdRouteImport.update({
+    id: '/categories/$id',
+    path: '/categories/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -113,6 +120,7 @@ export interface FileRoutesByFullPath {
   '/metrics': typeof AuthenticatedMetricsRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/api/chat-stream': typeof ApiChatStreamRoute
+  '/categories/$id': typeof AuthenticatedCategoriesIdRoute
   '/clients/$id': typeof AuthenticatedClientsIdRoute
   '/clients/new': typeof AuthenticatedClientsNewRoute
   '/clients/': typeof AuthenticatedClientsIndexRoute
@@ -129,6 +137,7 @@ export interface FileRoutesByTo {
   '/metrics': typeof AuthenticatedMetricsRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/api/chat-stream': typeof ApiChatStreamRoute
+  '/categories/$id': typeof AuthenticatedCategoriesIdRoute
   '/clients/$id': typeof AuthenticatedClientsIdRoute
   '/clients/new': typeof AuthenticatedClientsNewRoute
   '/clients': typeof AuthenticatedClientsIndexRoute
@@ -147,6 +156,7 @@ export interface FileRoutesById {
   '/_authenticated/metrics': typeof AuthenticatedMetricsRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/api/chat-stream': typeof ApiChatStreamRoute
+  '/_authenticated/categories/$id': typeof AuthenticatedCategoriesIdRoute
   '/_authenticated/clients/$id': typeof AuthenticatedClientsIdRoute
   '/_authenticated/clients/new': typeof AuthenticatedClientsNewRoute
   '/_authenticated/clients/': typeof AuthenticatedClientsIndexRoute
@@ -165,6 +175,7 @@ export interface FileRouteTypes {
     | '/metrics'
     | '/profile'
     | '/api/chat-stream'
+    | '/categories/$id'
     | '/clients/$id'
     | '/clients/new'
     | '/clients/'
@@ -181,6 +192,7 @@ export interface FileRouteTypes {
     | '/metrics'
     | '/profile'
     | '/api/chat-stream'
+    | '/categories/$id'
     | '/clients/$id'
     | '/clients/new'
     | '/clients'
@@ -198,6 +210,7 @@ export interface FileRouteTypes {
     | '/_authenticated/metrics'
     | '/_authenticated/profile'
     | '/api/chat-stream'
+    | '/_authenticated/categories/$id'
     | '/_authenticated/clients/$id'
     | '/_authenticated/clients/new'
     | '/_authenticated/clients/'
@@ -319,6 +332,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClientsIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/categories/$id': {
+      id: '/_authenticated/categories/$id'
+      path: '/categories/$id'
+      fullPath: '/categories/$id'
+      preLoaderRoute: typeof AuthenticatedCategoriesIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
@@ -329,6 +349,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedFollowUpsRoute: typeof AuthenticatedFollowUpsRoute
   AuthenticatedMetricsRoute: typeof AuthenticatedMetricsRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
+  AuthenticatedCategoriesIdRoute: typeof AuthenticatedCategoriesIdRoute
   AuthenticatedClientsIdRoute: typeof AuthenticatedClientsIdRoute
   AuthenticatedClientsNewRoute: typeof AuthenticatedClientsNewRoute
   AuthenticatedClientsIndexRoute: typeof AuthenticatedClientsIndexRoute
@@ -341,6 +362,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedFollowUpsRoute: AuthenticatedFollowUpsRoute,
   AuthenticatedMetricsRoute: AuthenticatedMetricsRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
+  AuthenticatedCategoriesIdRoute: AuthenticatedCategoriesIdRoute,
   AuthenticatedClientsIdRoute: AuthenticatedClientsIdRoute,
   AuthenticatedClientsNewRoute: AuthenticatedClientsNewRoute,
   AuthenticatedClientsIndexRoute: AuthenticatedClientsIndexRoute,
