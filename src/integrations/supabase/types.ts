@@ -63,6 +63,7 @@ export type Database = {
           name: string
           company_id: string
           pinned_to_sidebar: boolean
+          enable_subclients: boolean
         }
         Insert: {
           created_at?: string
@@ -70,6 +71,7 @@ export type Database = {
           name: string
           company_id: string
           pinned_to_sidebar?: boolean
+          enable_subclients?: boolean
         }
         Update: {
           created_at?: string
@@ -77,6 +79,7 @@ export type Database = {
           name?: string
           company_id?: string
           pinned_to_sidebar?: boolean
+          enable_subclients?: boolean
         }
         Relationships: [
           {

@@ -26,7 +26,7 @@ function CategoryPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
-  const { data: category } = useQuery({
+  const { data: category, isLoading: categoryLoading } = useQuery({
     queryKey: ["admin_category", id],
     queryFn: async () => {
       const res = await query('SELECT * FROM admin_categories WHERE id = $1', [id]);
@@ -36,10 +36,10 @@ function CategoryPage() {
     enabled: !!id,
   });
 
-  const categoryName = category?.name ?? "Category";
+  const categoryName = category?.name;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["clients", "category", id, companyId],
+    queryKey: ["clients", "category", id, companyId, categoryName],
     queryFn: async () => {
       if (!companyId || !categoryName) return [];
       const sql = `SELECT c.*, p.name AS created_by_name, p.department AS created_by_dept
@@ -85,8 +85,8 @@ function CategoryPage() {
             <ArrowLeft className="h-4 w-4 mr-1" />Back
           </Button>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">{categoryName}</h1>
-            <p className="text-sm text-muted-foreground">{data?.length ?? 0} clients in this category</p>
+            <h1 className="text-2xl font-bold tracking-tight">{categoryLoading ? "Loading…" : categoryName}</h1>
+            <p className="text-sm text-muted-foreground">{categoryLoading ? "" : `${data?.length ?? 0} clients in this category`}</p>
           </div>
         </div>
         <Button asChild>
@@ -119,7 +119,7 @@ function CategoryPage() {
         <DatePicker value={dateTo} onChange={setDateTo} placeholder="To" />
       </div>
 
-      {isLoading ? (
+      {categoryLoading || isLoading ? (
         <p className="text-muted-foreground">Loading…</p>
       ) : filtered.length === 0 ? (
         <Card><CardContent className="p-8 text-center text-muted-foreground">No clients in this category yet.</CardContent></Card>

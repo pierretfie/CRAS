@@ -201,6 +201,20 @@ function ClientDetail() {
     enabled: !!id,
   });
 
+  const { data: categoryConfig } = useQuery({
+    queryKey: ["category-subclients", client?.category, me?.company?.id],
+    queryFn: async () => {
+      if (!client?.category || !me?.company?.id) return null;
+      const res = await query(
+        `SELECT enable_subclients FROM admin_categories WHERE name = $1 AND company_id = $2`,
+        [client.category, me.company.id]
+      );
+      if (res.error) throw res.error;
+      return res.data && res.data.length > 0 ? res.data[0] : null;
+    },
+    enabled: !!client?.category && !!me?.company?.id,
+  });
+
   // Check access: owner, admin, or has an approved request
   const { data: accessRequest } = useQuery({
     queryKey: ["access-request", id, me?.user?.id],
@@ -298,7 +312,9 @@ function ClientDetail() {
         </CardContent>
       </Card>
 
-      <SubClientsCard clientId={client.id} clientName={client.name} subClients={subClients ?? []} onAdded={() => { refetchSubClients(); }} />
+      {categoryConfig?.enable_subclients && (
+        <SubClientsCard clientId={client.id} clientName={client.name} subClients={subClients ?? []} onAdded={() => { refetchSubClients(); }} />
+      )}
 
       {client.custom_fields && Object.keys(client.custom_fields as Record<string, string>).length > 0 && (
         <Card>

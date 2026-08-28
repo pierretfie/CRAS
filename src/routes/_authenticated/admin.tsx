@@ -60,7 +60,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Send, Bot, User, ShieldAlert, Loader2, FileText, Copy, Square, Pencil, Check, X, ShieldCheck, ShieldOff, RotateCcw, Brain, ChevronDown, ChevronRight, Building2, Globe, Phone, MapPin, Briefcase, Save, Pin } from "lucide-react";
+import { Plus, Trash2, Send, Bot, User, ShieldAlert, Loader2, FileText, Copy, Square, Pencil, Check, X, ShieldCheck, ShieldOff, RotateCcw, Brain, ChevronDown, ChevronRight, Building2, Globe, Phone, MapPin, Briefcase, Save, Pin, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 import { useAnalyticsData } from "@/hooks/use-analytics-data";
 import { Markdown } from "@/components/markdown";
@@ -647,6 +647,12 @@ function CategoriesTab() {
     qc.invalidateQueries({ queryKey: ["pinned_categories", companyId] });
   }
 
+  async function toggleSubclients(id: string, current: boolean) {
+    const res = await query('UPDATE admin_categories SET enable_subclients = $1 WHERE id = $2', [!current, id]);
+    if (res.error) return toast.error(res.error.message);
+    qc.invalidateQueries({ queryKey: ["admin_categories", companyId] });
+  }
+
   return (
     <Card>
       <CardHeader><CardTitle>Client Categories</CardTitle></CardHeader>
@@ -681,6 +687,14 @@ function CategoriesTab() {
                       title={c.pinned_to_sidebar ? "Unpin from sidebar" : "Pin to sidebar"}
                     >
                       <Pin className={`h-4 w-4 ${c.pinned_to_sidebar ? "fill-primary text-primary" : "text-muted-foreground"}`} />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => toggleSubclients(c.id, c.enable_subclients)}
+                      title={c.enable_subclients ? "Disable sub-clients" : "Enable sub-clients"}
+                    >
+                      <UsersRound className={`h-4 w-4 ${c.enable_subclients ? "fill-primary text-primary" : "text-muted-foreground"}`} />
                     </Button>
                     <Button size="icon" variant="ghost" onClick={() => { setEditingId(c.id); setEditName(c.name); }}><Pencil className="h-4 w-4" /></Button>
                     <Button size="icon" variant="ghost" onClick={() => del(c.id)}><Trash2 className="h-4 w-4" /></Button>
