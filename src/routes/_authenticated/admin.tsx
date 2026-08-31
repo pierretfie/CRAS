@@ -86,9 +86,153 @@ function AdminPage() {
           <p className="font-semibold">Admin only</p>
           <p className="text-sm text-muted-foreground">You don't have admin access.</p>
         </CardContent>
-      </Card>
-    );
+    </Card>
+  );
+}
+
+function SelfHostedTab() {
+  const qc = useQueryClient();
+  const { data: me } = useCurrentUser();
+  const companyId = me?.company?.id;
+  const [connStr, setConnStr] = useState("");
+  const [revealed, setRevealed] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  const { data: company } = useQuery({
+    queryKey: ["company", companyId],
+    queryFn: async () => {
+      if (!companyId) return null;
+      const res = await query("SELECT id, name, connection_string FROM companies WHERE id = $1", [companyId], companyId);
+      return res.data?.[0] ?? null;
+    },
+    enabled: !!companyId,
+  });
+
+  const hasConnStr = !!(company as any)?.connection_string;
+
+  async function save() {
+    if (!connStr.trim() || !companyId) return;
+    setSaving(true);
+    try {
+      const { saveConnectionStringFn } = await import("@/lib/db.fn");
+      const res = await saveConnectionStringFn({ data: { companyId, connectionString: connStr.trim() } });
+      if (res.error) throw new Error(res.error.message);
+      toast.success("Connection string saved (encrypted)");
+      setConnStr("");
+      qc.invalidateQueries({ queryKey: ["company", companyId] });
+    } catch (err: any) {
+      toast.error(err.message ?? "Failed to save");
+    } finally {
+      setSaving(false);
+    }
   }
+
+  async function reveal() {
+    if (!companyId) return;
+    try {
+      const { revealConnectionStringFn } = await import("@/lib/db.fn");
+      const res = await revealConnectionStringFn({ data: { companyId } });
+      if (res.error) throw new Error(res.error.message);
+      setRevealed(res.data ?? "No connection string set");
+    } catch (err: any) {
+      toast.error(err.message ?? "Failed to reveal");
+    }
+  }
+
+  async function testConnection() {
+    if (!companyId) return;
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await query("SELECT 1 AS ok", [], companyId);
+      if (res.error) {
+        setTestResult({ ok: false, msg: res.error.message });
+      } else {
+        setTestResult({ ok: true, msg: "Connection successful" });
+      }
+    } catch (err: any) {
+      setTestResult({ ok: false, msg: err.message ?? "Connection failed" });
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  async function remove() {
+    if (!companyId) return;
+    if (!confirm("Remove connection string? Company will fall back to central database.")) return;
+    try {
+      await query("UPDATE companies SET connection_string = NULL WHERE id = $1", [companyId], companyId);
+      toast.success("Connection string removed");
+      setRevealed(null);
+      qc.invalidateQueries({ queryKey: ["company", companyId] });
+    } catch (err: any) {
+      toast.error(err.message ?? "Failed to remove");
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Self-Hosted Database</CardTitle>
+        <CardDescription>
+          Connect CRAS to an external PostgreSQL database. The connection string is encrypted before storing.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="rounded-md bg-muted p-3 text-sm">
+          <p className="font-medium">Status: {hasConnStr ? "External database connected" : "Using central database (hosted by CRAS)"}</p>
+          {hasConnStr && <p className="text-muted-foreground mt-1">Data is stored in your own PostgreSQL database.</p>}
+        </div>
+
+        <div className="space-y-2">
+          <Label>Connection String</Label>
+          <Input
+            type="password"
+            placeholder="postgresql://user:password@host:5432/dbname?sslmode=require"
+            value={connStr}
+            onChange={(e) => setConnStr(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">
+            Format: postgresql://user:password@host:5432/dbname?sslmode=require
+          </p>
+        </div>
+
+        <div className="flex gap-2">
+          <Button onClick={save} disabled={!connStr.trim() || saving}>
+            {saving ? "Saving…" : "Save (Encrypted)"}
+          </Button>
+          <Button variant="outline" onClick={testConnection} disabled={testing || !hasConnStr}>
+            {testing ? "Testing…" : "Test Connection"}
+          </Button>
+        </div>
+
+        {testResult && (
+          <div className={`rounded-md p-3 text-sm ${testResult.ok ? "bg-green-50 text-green-700 border border-green-200" : "bg-destructive/10 text-destructive border border-destructive/20"}`}>
+            {testResult.msg}
+          </div>
+        )}
+
+        {hasConnStr && (
+          <div className="space-y-2 border-t pt-4">
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={reveal}>
+                {revealed ? "Hide" : "Reveal Connection String"}
+              </Button>
+              <Button variant="destructive" size="sm" onClick={remove}>
+                Remove
+              </Button>
+            </div>
+            {revealed && (
+              <pre className="rounded-md bg-muted p-3 text-xs font-mono break-all whitespace-pre-wrap">{revealed}</pre>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
   return (
     <div className="space-y-4">
@@ -97,12 +241,13 @@ function AdminPage() {
         <p className="text-sm text-muted-foreground">Manage workspace configuration</p>
       </div>
       <Tabs defaultValue="users">
-        <TabsList className="grid grid-cols-6 max-w-2xl">
+        <TabsList className="grid grid-cols-7 max-w-3xl">
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="categories">Categories</TabsTrigger>
           <TabsTrigger value="products">Products</TabsTrigger>
           <TabsTrigger value="stages">Stages</TabsTrigger>
           <TabsTrigger value="company">Company</TabsTrigger>
+          <TabsTrigger value="selfhosted">Self-Hosted</TabsTrigger>
           <TabsTrigger value="console">AI Console</TabsTrigger>
         </TabsList>
         <TabsContent value="users"><div className="max-w-4xl"><UsersTab /></div></TabsContent>
@@ -110,6 +255,7 @@ function AdminPage() {
         <TabsContent value="products"><div className="max-w-2xl"><ProductsTab /></div></TabsContent>
         <TabsContent value="stages"><div className="max-w-2xl"><StagesTab /></div></TabsContent>
         <TabsContent value="company"><div className="max-w-2xl"><CompanyTab /></div></TabsContent>
+        <TabsContent value="selfhosted"><div className="max-w-2xl"><SelfHostedTab /></div></TabsContent>
         <TabsContent value="console"><ConsoleTab /></TabsContent>
       </Tabs>
     </div>

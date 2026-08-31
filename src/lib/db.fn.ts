@@ -17,3 +17,26 @@ export const dbQueryFn = createServerFn({ method: "POST" })
     const { queryServer } = await import("./db.server");
     return queryServer(data.text, data.params, data.companyId);
   });
+
+export const saveConnectionStringFn = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      companyId: z.string().uuid(),
+      connectionString: z.string().min(1),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const { saveConnectionString } = await import("./db.server");
+    return saveConnectionString(data.companyId, data.connectionString);
+  });
+
+export const revealConnectionStringFn = createServerFn({ method: "POST" })
+  .validator(
+    z.object({
+      companyId: z.string().uuid(),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const { revealConnectionString } = await import("./db.server");
+    return revealConnectionString(data.companyId);
+  });
