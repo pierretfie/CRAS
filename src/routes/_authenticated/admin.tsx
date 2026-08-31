@@ -145,8 +145,19 @@ function SelfHostedTab() {
     if (!connStr.trim() || !companyId) return;
     setSaving(true);
     try {
-      const { saveConnectionStringFn } = await import("@/lib/db.fn");
-      const res = await saveConnectionStringFn({ data: { companyId, connectionString: connStr.trim() } });
+      const apiUrl = (import.meta as any).env?.VITE_API_URL as string | undefined;
+      let res: any;
+      if (apiUrl) {
+        const r = await fetch(`${apiUrl.replace(/\/$/, "")}/api/save-connection-string`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ companyId, connectionString: connStr.trim() }),
+        });
+        res = await r.json();
+      } else {
+        const { saveConnectionStringFn } = await import("@/lib/db.fn");
+        res = await saveConnectionStringFn({ data: { companyId, connectionString: connStr.trim() } });
+      }
       if (res.error) throw new Error(res.error.message);
       toast.success("Connection string saved (encrypted)");
       setConnStr("");
