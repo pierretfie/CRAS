@@ -29,7 +29,7 @@ function CategoryPage() {
   const { data: category, isLoading: categoryLoading } = useQuery({
     queryKey: ["admin_category", id],
     queryFn: async () => {
-      const res = await query('SELECT * FROM admin_categories WHERE id = $1', [id]);
+      const res = await query('SELECT * FROM admin_categories WHERE id = $1', [id], companyId);
       if (res.error) throw res.error;
       return res.data?.[0] as { id: string; name: string } | undefined;
     },
@@ -47,7 +47,7 @@ function CategoryPage() {
          LEFT JOIN profiles p ON p.id = c.created_by
          WHERE c.company_id = $1 AND c.category = $2 AND c.parent_client_id IS NULL
          ORDER BY c.updated_at DESC`;
-      const res = await query(sql, [companyId, categoryName]);
+      const res = await query(sql, [companyId, categoryName], companyId);
       if (res.error) throw res.error;
       return res.data;
     },

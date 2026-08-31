@@ -35,7 +35,8 @@ export function DataScopeToggle() {
          JOIN auth.users u ON u.id = p.id
          WHERE p.company_id = $1
          ORDER BY p.name`,
-        [companyId]
+        [companyId],
+        companyId
       )
         .then(({ data }) => setUsers((data as UserOption[]) || []))
         .finally(() => setLoading(false));

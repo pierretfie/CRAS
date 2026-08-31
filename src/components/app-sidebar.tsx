@@ -31,7 +31,7 @@ export function AppSidebar() {
     queryKey: ["pinned_categories", companyId],
     queryFn: async () => {
       if (!companyId) return [];
-      const res = await query('SELECT id, name FROM admin_categories WHERE company_id = $1 AND pinned_to_sidebar = true ORDER BY name', [companyId]);
+      const res = await query('SELECT id, name FROM admin_categories WHERE company_id = $1 AND pinned_to_sidebar = true ORDER BY name', [companyId], companyId);
       if (res.error) throw res.error;
       return res.data as { id: string; name: string }[];
     },

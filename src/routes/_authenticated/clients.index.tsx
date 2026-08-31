@@ -37,7 +37,7 @@ function ClientsList() {
            LEFT JOIN profiles p ON p.id = c.created_by
            WHERE c.company_id = $1 AND c.parent_client_id IS NULL
            ORDER BY c.updated_at DESC`;
-        const res = await query(sql, [companyId]);
+        const res = await query(sql, [companyId], companyId);
         if (res.error) throw res.error;
         return res.data;
       }
@@ -55,7 +55,7 @@ function ClientsList() {
         ) AS user_clients
       `;
 
-      const clientIdsRes = await query(clientIdsSql, [effectiveUserId, companyId]);
+      const clientIdsRes = await query(clientIdsSql, [effectiveUserId, companyId], companyId);
       if (clientIdsRes.error) throw clientIdsRes.error;
 
       const clientIds = ((clientIdsRes.data ?? []) as Array<{ client_id: string }>).map(row => row.client_id);
@@ -70,7 +70,7 @@ function ClientsList() {
          WHERE c.id = ANY($1::uuid[]) AND c.company_id = $2 AND c.parent_client_id IS NULL
          ORDER BY c.updated_at DESC`;
 
-      const res = await query(sql, [clientIds, companyId]);
+      const res = await query(sql, [clientIds, companyId], companyId);
       if (res.error) throw res.error;
       return res.data;
     },
@@ -100,7 +100,7 @@ function ClientsList() {
     queryKey: ["admin_categories", companyId],
     queryFn: async () => {
       if (!companyId) return [];
-      const res = await query('SELECT * FROM admin_categories WHERE company_id = $1 ORDER BY name', [companyId]);
+      const res = await query('SELECT * FROM admin_categories WHERE company_id = $1 ORDER BY name', [companyId], companyId);
       if (res.error) throw res.error;
       return res.data;
     },

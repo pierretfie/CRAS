@@ -125,8 +125,8 @@ function UsersTab() {
       if (!me?.company?.id) return [];
       const companyId = me.company.id;
       const [{ data: profiles }, { data: roles }] = await Promise.all([
-        query('SELECT * FROM profiles WHERE company_id = $1 ORDER BY created_at DESC', [companyId]),
-        query('SELECT ur.* FROM user_roles ur JOIN profiles p ON p.id = ur.user_id WHERE p.company_id = $1', [companyId]),
+        query('SELECT * FROM profiles WHERE company_id = $1 ORDER BY created_at DESC', [companyId], companyId),
+        query('SELECT ur.* FROM user_roles ur JOIN profiles p ON p.id = ur.user_id WHERE p.company_id = $1', [companyId], companyId),
       ]);
       if (!profiles) return [];
       const roleMap = new Map<string, string[]>();
@@ -244,7 +244,7 @@ function UsersTab() {
         {/* User list */}
         <div className="space-y-2">
           {users?.map((u: any) => (
-            <UserRow key={u.id} u={u} isSelf={u.id === me?.user?.id} onRefetch={refetch} />
+            <UserRow key={u.id} u={u} isSelf={u.id === me?.user?.id} onRefetch={refetch} companyId={companyId} />
           ))}
           {!users?.length && <p className="text-sm text-muted-foreground">No users yet.</p>}
         </div>
@@ -254,7 +254,7 @@ function UsersTab() {
 }
 
 
-function UserRow({ u, isSelf, onRefetch }: { u: any; isSelf: boolean; onRefetch: () => void }) {
+function UserRow({ u, isSelf, onRefetch, companyId }: { u: any; isSelf: boolean; onRefetch: () => void; companyId: string }) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ name: u.name, email: u.email ?? "", department: u.department ?? "" });
   const [saving, setSaving] = useState(false);
@@ -269,7 +269,8 @@ function UserRow({ u, isSelf, onRefetch }: { u: any; isSelf: boolean; onRefetch:
       // Update profile (name + department)
       const res = await query(
         'UPDATE profiles SET name = $1, department = $2 WHERE id = $3',
-        [form.name.trim(), form.department.trim() || null, u.id]
+        [form.name.trim(), form.department.trim() || null, u.id],
+        companyId
       );
       if (res.error) throw res.error;
 
@@ -294,14 +295,16 @@ function UserRow({ u, isSelf, onRefetch }: { u: any; isSelf: boolean; onRefetch:
       if (isAdmin) {
         const res = await query(
           'DELETE FROM user_roles WHERE user_id = $1 AND role = $2',
-          [u.id, 'admin']
+          [u.id, 'admin'],
+          companyId
         );
         if (res.error) throw res.error;
         toast.success(`${u.name} demoted to user`);
       } else {
         const res = await query(
           'INSERT INTO user_roles (user_id, role) VALUES ($1, $2)',
-          [u.id, 'admin']
+          [u.id, 'admin'],
+          companyId
         );
         if (res.error) throw res.error;
         toast.success(`${u.name} promoted to admin`);
@@ -591,7 +594,7 @@ function CategoriesTab() {
     queryKey: ["admin_categories", companyId],
     queryFn: async () => {
       if (!companyId) return [];
-      const res = await query('SELECT * FROM admin_categories WHERE company_id = $1 ORDER BY name', [companyId]);
+      const res = await query('SELECT * FROM admin_categories WHERE company_id = $1 ORDER BY name', [companyId], companyId);
       if (res.error) throw res.error;
       return res.data;
     },
@@ -605,7 +608,7 @@ function CategoriesTab() {
     if (!name.trim()) return;
     if (!companyId) return toast.error("Company not found");
     try {
-      const res = await query('INSERT INTO admin_categories (name, company_id) VALUES ($1, $2)', [name.trim(), companyId]);
+      const res = await query('INSERT INTO admin_categories (name, company_id) VALUES ($1, $2)', [name.trim(), companyId], companyId);
       if (res.error) throw res.error;
       setName("");
       qc.invalidateQueries({ queryKey: ["admin_categories", companyId] });
@@ -618,7 +621,7 @@ function CategoriesTab() {
   async function update(id: string) {
     if (!editName.trim()) return;
     try {
-      const res = await query('UPDATE admin_categories SET name = $1 WHERE id = $2', [editName.trim(), id]);
+      const res = await query('UPDATE admin_categories SET name = $1 WHERE id = $2', [editName.trim(), id], companyId);
       if (res.error) throw res.error;
       setEditingId(null);
       qc.invalidateQueries({ queryKey: ["admin_categories", companyId] });
@@ -631,7 +634,7 @@ function CategoriesTab() {
   async function del(id: string) {
     try {
       if (!companyId) return toast.error("Company not found");
-      const res = await query('DELETE FROM admin_categories WHERE id = $1 AND company_id = $2', [id, companyId]);
+      const res = await query('DELETE FROM admin_categories WHERE id = $1 AND company_id = $2', [id, companyId], companyId);
       if (res.error) throw res.error;
       qc.invalidateQueries({ queryKey: ["admin_categories", companyId] });
     } catch (err: any) {
@@ -641,14 +644,14 @@ function CategoriesTab() {
   }
 
   async function togglePin(id: string, current: boolean) {
-    const res = await query('UPDATE admin_categories SET pinned_to_sidebar = $1 WHERE id = $2', [!current, id]);
+    const res = await query('UPDATE admin_categories SET pinned_to_sidebar = $1 WHERE id = $2', [!current, id], companyId);
     if (res.error) return toast.error(res.error.message);
     qc.invalidateQueries({ queryKey: ["admin_categories", companyId] });
     qc.invalidateQueries({ queryKey: ["pinned_categories", companyId] });
   }
 
   async function toggleSubclients(id: string, current: boolean) {
-    const res = await query('UPDATE admin_categories SET enable_subclients = $1 WHERE id = $2', [!current, id]);
+    const res = await query('UPDATE admin_categories SET enable_subclients = $1 WHERE id = $2', [!current, id], companyId);
     if (res.error) return toast.error(res.error.message);
     qc.invalidateQueries({ queryKey: ["admin_categories", companyId] });
   }
@@ -794,7 +797,7 @@ function StagesTab() {
     queryKey: ["stage_config", companyId],
     queryFn: async () => {
       if (!companyId) return [];
-      const res = await query('SELECT * FROM conversion_stage_config WHERE company_id = $1 ORDER BY stage_number', [companyId]);
+      const res = await query('SELECT * FROM conversion_stage_config WHERE company_id = $1 ORDER BY stage_number', [companyId], companyId);
       if (res.error) throw res.error;
       return res.data;
     },
@@ -828,7 +831,7 @@ function StagesTab() {
           values.push(patch.description);
         }
         if (setClause === "") continue;
-        const res = await query(`UPDATE conversion_stage_config SET ${setClause} WHERE id = $${values.length + 1} AND company_id = $${values.length + 2}`, [...values, id, companyId]);
+        const res = await query(`UPDATE conversion_stage_config SET ${setClause} WHERE id = $${values.length + 1} AND company_id = $${values.length + 2}`, [...values, id, companyId], companyId);
         if (res.error) throw res.error;
       }
       setDraft({});

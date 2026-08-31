@@ -10,9 +10,10 @@ export const dbQueryFn = createServerFn({ method: "POST" })
     z.object({
       text: z.string(),
       params: z.array(z.any()).optional(),
+      companyId: z.string().uuid().nullable().optional(),
     }),
   )
   .handler(async ({ data }) => {
     const { queryServer } = await import("./db.server");
-    return queryServer(data.text, data.params);
+    return queryServer(data.text, data.params, data.companyId);
   });

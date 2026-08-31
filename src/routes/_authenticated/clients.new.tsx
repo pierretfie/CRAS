@@ -63,7 +63,7 @@ function NewClient() {
     queryKey: ["admin_categories", companyId],
     queryFn: async () => {
       if (!companyId) return [];
-      const res = await query('SELECT * FROM admin_categories WHERE company_id = $1 ORDER BY name', [companyId]);
+      const res = await query('SELECT * FROM admin_categories WHERE company_id = $1 ORDER BY name', [companyId], companyId);
       if (res.error) throw res.error;
       return res.data;
     },
@@ -78,7 +78,7 @@ function NewClient() {
     queryKey: ["stage_config", companyId],
     queryFn: async () => {
       if (!companyId) return [];
-      const res = await query('SELECT * FROM conversion_stage_config WHERE company_id = $1 ORDER BY stage_number', [companyId]);
+      const res = await query('SELECT * FROM conversion_stage_config WHERE company_id = $1 ORDER BY stage_number', [companyId], companyId);
       if (res.error) throw res.error;
       return res.data;
     },

@@ -92,7 +92,7 @@ function ProfilePage() {
       if (error) throw error;
 
       // Clear must_change_password flag if it was set
-      await query("UPDATE profiles SET must_change_password = false WHERE id = $1", [user.id]);
+      await query("UPDATE profiles SET must_change_password = false WHERE id = $1", [user.id], me?.company?.id);
       qc.invalidateQueries({ queryKey: ["current-user"] });
 
       setCurrentPwd("");

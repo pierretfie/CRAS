@@ -17,11 +17,11 @@ export function useAnalyticsData(userId?: string | null, companyId?: string | nu
       if (!userId) {
         // "All Data" mode — scoped to company
         const [{ data: clients }, { data: events }, { data: profiles }, { data: followUps }, { data: followUpLogs }] = await Promise.all([
-          query('SELECT * FROM clients WHERE company_id = $1', [companyId]),
-          query('SELECT e.* FROM client_stage_events e JOIN clients c ON c.id = e.client_id WHERE c.company_id = $1', [companyId]),
-          query('SELECT * FROM profiles WHERE company_id = $1', [companyId]),
-          query("SELECT f.* FROM client_follow_ups f JOIN clients c ON c.id = f.client_id WHERE c.company_id = $1 AND f.status = 'active'", [companyId]),
-          query('SELECT l.* FROM follow_up_logs l JOIN clients c ON c.id = l.client_id WHERE c.company_id = $1', [companyId]),
+          query('SELECT * FROM clients WHERE company_id = $1', [companyId], companyId),
+          query('SELECT e.* FROM client_stage_events e JOIN clients c ON c.id = e.client_id WHERE c.company_id = $1', [companyId], companyId),
+          query('SELECT * FROM profiles WHERE company_id = $1', [companyId], companyId),
+          query("SELECT f.* FROM client_follow_ups f JOIN clients c ON c.id = f.client_id WHERE c.company_id = $1 AND f.status = 'active'", [companyId], companyId),
+          query('SELECT l.* FROM follow_up_logs l JOIN clients c ON c.id = l.client_id WHERE c.company_id = $1', [companyId], companyId),
         ]);
 
         const rawClients = (clients ?? []) as ClientRow[];
@@ -38,7 +38,7 @@ export function useAnalyticsData(userId?: string | null, companyId?: string | nu
 
       // "Your Data" mode — scoped to company + user
       const [{ data: profiles }] = await Promise.all([
-        query('SELECT * FROM profiles WHERE company_id = $1', [companyId]),
+        query('SELECT * FROM profiles WHERE company_id = $1', [companyId], companyId),
       ]);
 
       const rawProfiles = (profiles ?? []) as ProfileRow[];
@@ -53,7 +53,7 @@ export function useAnalyticsData(userId?: string | null, companyId?: string | nu
           UNION
           SELECT l.client_id FROM follow_up_logs l JOIN clients c ON c.id = l.client_id WHERE l.user_id = $1 AND c.company_id = $2
         ) AS user_clients
-      `, [userId, companyId]);
+      `, [userId, companyId], companyId);
 
       const clientIds = ((clientIdsData ?? []) as Array<{ client_id: string }>).map(row => row.client_id);
 
@@ -65,10 +65,10 @@ export function useAnalyticsData(userId?: string | null, companyId?: string | nu
       }
 
       const [{ data: clients }, { data: events }, { data: followUps }, { data: followUpLogs }] = await Promise.all([
-        query('SELECT * FROM clients WHERE id = ANY($1::uuid[]) AND company_id = $2', [clientIds, companyId]),
-        query('SELECT * FROM client_stage_events WHERE client_id = ANY($1::uuid[])', [clientIds]),
-        query("SELECT client_id, status FROM client_follow_ups WHERE status = 'active' AND client_id = ANY($1::uuid[])", [clientIds]),
-        query('SELECT follow_up_id, client_id, user_id, activity_type, logged_at FROM follow_up_logs WHERE client_id = ANY($1::uuid[])', [clientIds]),
+        query('SELECT * FROM clients WHERE id = ANY($1::uuid[]) AND company_id = $2', [clientIds, companyId], companyId),
+        query('SELECT * FROM client_stage_events WHERE client_id = ANY($1::uuid[])', [clientIds], companyId),
+        query("SELECT client_id, status FROM client_follow_ups WHERE status = 'active' AND client_id = ANY($1::uuid[])", [clientIds], companyId),
+        query('SELECT follow_up_id, client_id, user_id, activity_type, logged_at FROM follow_up_logs WHERE client_id = ANY($1::uuid[])', [clientIds], companyId),
       ]);
 
       const rawClients = (clients ?? []) as ClientRow[];

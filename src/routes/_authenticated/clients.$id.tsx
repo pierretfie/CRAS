@@ -164,7 +164,8 @@ function ClientDetail() {
          LEFT JOIN profiles p ON p.id = c.created_by
          LEFT JOIN clients pc ON pc.id = c.parent_client_id
          WHERE c.id = $1 AND c.company_id = $2`,
-        [id, me.company.id]
+        [id, me.company.id],
+        me.company.id
       );
       if (res.error) throw res.error;
       return res.data && res.data.length > 0 ? res.data[0] : null;
@@ -180,7 +181,8 @@ function ClientDetail() {
          LEFT JOIN profiles p ON p.id = e.user_id
          WHERE e.client_id = $1
          ORDER BY e.created_at DESC`,
-        [id]
+        [id],
+        me?.company?.id
       );
       if (res.error) throw res.error;
       return res.data;
@@ -193,7 +195,8 @@ function ClientDetail() {
     queryFn: async () => {
       const res = await query(
         `SELECT id, name, email, location, status FROM clients WHERE parent_client_id = $1 ORDER BY name`,
-        [id]
+        [id],
+        me?.company?.id
       );
       if (res.error) throw res.error;
       return res.data;
@@ -207,7 +210,8 @@ function ClientDetail() {
       if (!client?.category || !me?.company?.id) return null;
       const res = await query(
         `SELECT enable_subclients FROM admin_categories WHERE name = $1 AND company_id = $2`,
-        [client.category, me.company.id]
+        [client.category, me.company.id],
+        me.company.id
       );
       if (res.error) throw res.error;
       return res.data && res.data.length > 0 ? res.data[0] : null;
@@ -550,7 +554,8 @@ function AccessRequestManager({ clientId }: { clientId: string }) {
          LEFT JOIN profiles p ON p.id = r.requester_id
          WHERE r.client_id = $1 AND r.status = 'pending'
          ORDER BY r.created_at DESC`,
-        [clientId]
+        [clientId],
+        me?.company?.id
       );
       return (res.data ?? []) as any[];
     },
@@ -648,7 +653,7 @@ function EditClientDialog({ client, onSaved }: { client: { id: string; name: str
     queryKey: ["admin_categories", me?.company?.id],
     queryFn: async () => {
       if (!me?.company?.id) return [];
-      const res = await query('SELECT * FROM admin_categories WHERE company_id = $1 ORDER BY name', [me.company.id]);
+      const res = await query('SELECT * FROM admin_categories WHERE company_id = $1 ORDER BY name', [me.company.id], me.company.id);
       if (res.error) throw res.error;
       return res.data;
     },
@@ -822,17 +827,20 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
     if (mode === "won") {
       clientRes = await query(
         `UPDATE clients SET status = 'won', current_stage = 3, stage_value = 1 WHERE id = $1 AND company_id = $2`,
-        [client.id, me?.company?.id]
+        [client.id, me?.company?.id],
+        me?.company?.id
       );
     } else if (mode === "lost") {
       clientRes = await query(
         `UPDATE clients SET status = 'lost', lost_reason = $1 WHERE id = $2 AND company_id = $3`,
-        [reason, client.id, me?.company?.id]
+        [reason, client.id, me?.company?.id],
+        me?.company?.id
       );
     } else {
       clientRes = await query(
         `UPDATE clients SET current_stage = $1, stage_value = $2, stage_notes = $3 WHERE id = $4 AND company_id = $5`,
-        [toStage, stageVal, description, client.id, me?.company?.id]
+        [toStage, stageVal, description, client.id, me?.company?.id],
+        me?.company?.id
       );
     }
     if (clientRes.error) {
@@ -848,7 +856,8 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
     const eventRes = await query(
       `INSERT INTO client_stage_events (client_id, user_id, from_stage, to_stage, event_type, description, lost_reason, stage_value, activity_type, interest_scale)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-      [client.id, u.user.id, client.current_stage, toStageVal, eventType, description, lostReasonInsert, stageValInsert, activityType || null, interestScale]
+      [client.id, u.user.id, client.current_stage, toStageVal, eventType, description, lostReasonInsert, stageValInsert, activityType || null, interestScale],
+      me?.company?.id
     );
     if (eventRes.error) {
       setSaving(false);

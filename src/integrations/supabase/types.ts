@@ -25,6 +25,7 @@ export type Database = {
           address: string | null
           logo_url: string | null
           active: boolean
+          connection_string: string | null
           created_at: string
           updated_at: string
         }
@@ -38,6 +39,7 @@ export type Database = {
           address?: string | null
           logo_url?: string | null
           active?: boolean
+          connection_string?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -51,6 +53,7 @@ export type Database = {
           address?: string | null
           logo_url?: string | null
           active?: boolean
+          connection_string?: string | null
           created_at?: string
           updated_at?: string
         }
