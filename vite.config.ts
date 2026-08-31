@@ -28,10 +28,9 @@ export default defineConfig({
       },
     }),
     react(),
-    isElectron &&
-      nitro({
-        preset: "node-server",
-      }),
+    nitro({
+      preset: "node-server",
+    }),
   ].filter(Boolean),
   server: { host: "::", port: 8080 },
 });

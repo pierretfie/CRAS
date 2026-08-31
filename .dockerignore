@@ -1,0 +1,12 @@
+node_modules
+dist
+dist-electron
+.output
+.git
+.env
+Migrate data to Digital Ocean
+release
+.opencode
+graphify-out
+*.log
+*.local

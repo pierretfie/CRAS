@@ -17,6 +17,9 @@ dist-electron
 .nitro
 *.local
 .claude/**
+.env
+Migrate data to Digital Ocean/
+release/
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars
