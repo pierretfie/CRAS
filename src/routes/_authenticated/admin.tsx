@@ -60,7 +60,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Send, Bot, User, ShieldAlert, Loader2, FileText, Copy, Square, Pencil, Check, X, ShieldCheck, ShieldOff, RotateCcw, Brain, ChevronDown, ChevronRight, Building2, Globe, Phone, MapPin, Briefcase, Save, Pin, UsersRound, Database, Eye, EyeOff, Lock } from "lucide-react";
+import { Plus, Trash2, Send, Bot, User, ShieldAlert, Loader2, FileText, Copy, Square, Pencil, Check, X, ShieldCheck, ShieldOff, RotateCcw, Brain, ChevronDown, ChevronRight, Building2, Globe, Phone, MapPin, Briefcase, Save, Pin, UsersRound, Database, Eye, EyeOff, Lock, Info } from "lucide-react";
 import { toast } from "sonner";
 import { useAnalyticsData } from "@/hooks/use-analytics-data";
 import { Markdown } from "@/components/markdown";
@@ -230,6 +230,12 @@ function SelfHostedTab() {
           {hasConnStr && <p className="text-muted-foreground mt-1">Data is stored in your own PostgreSQL database.</p>}
         </div>
 
+        <div className="rounded-md border bg-blue-50 dark:bg-blue-950/20 p-3 text-xs space-y-1">
+          <p className="font-medium flex items-center gap-1.5"><Info className="h-3 w-3" /> How to get your URI</p>
+          <p><span className="font-medium">Supabase / Neon:</span> Dashboard → Database → Connection string → <span className="font-medium">Pooler</span> (port 5432) — don't use Direct.</p>
+          <p><span className="font-medium">DigitalOcean / RDS / self-hosted:</span> Copy URI from your provider as shown.</p>
+        </div>
+
         <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
           <div className="flex items-center gap-2.5">
             <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 border border-primary/20">
@@ -260,6 +266,9 @@ function SelfHostedTab() {
               {showConnStr ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </Button>
           </div>
+          {connStr.includes("db.") && connStr.includes("supabase.co") && !connStr.includes("pooler") && (
+            <p className="text-xs text-amber-600 dark:text-amber-400">⚠️ Direct Supabase URI — use Pooler (pooler.supabase.com:5432) instead.</p>
+          )}
           <div className="rounded-md bg-muted px-3 py-2.5 border">
             <p className="text-xs font-medium mb-1">Format</p>
             <code className="text-xs font-mono break-all text-muted-foreground">postgresql://user:password@host:5432/dbname?sslmode=require</code>
