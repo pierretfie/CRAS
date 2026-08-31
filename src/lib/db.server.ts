@@ -94,6 +94,27 @@ export async function saveConnectionString(companyId: string, connectionString: 
 }
 
 /**
+ * Test a raw connection string without saving.
+ * Used to verify credentials before encrypting/storing.
+ */
+export async function testRawConnectionString(connectionString: string): Promise<{ ok: boolean; error: SerializableError }> {
+  let pool: Pool | null = null;
+  try {
+    pool = new Pool({ connectionString, connectionTimeoutMillis: 5000 });
+    await pool.query("SELECT 1 AS ok");
+    return { ok: true, error: null };
+  } catch (err) {
+    const error: SerializableError =
+      err instanceof Error
+        ? { message: err.message, stack: err.stack ?? null }
+        : { message: String(err), stack: null };
+    return { ok: false, error };
+  } finally {
+    if (pool) await pool.end().catch(() => {});
+  }
+}
+
+/**
  * Reveal a company's connection string (decrypted).
  * Only callable by the company's own admin.
  */

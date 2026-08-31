@@ -40,3 +40,10 @@ export const revealConnectionStringFn = createServerFn({ method: "POST" })
     const { revealConnectionString } = await import("./db.server");
     return revealConnectionString(data.companyId);
   });
+
+export const testRawConnectionStringFn = createServerFn({ method: "POST" })
+  .validator(z.object({ connectionString: z.string().min(1) }))
+  .handler(async ({ data }) => {
+    const { testRawConnectionString } = await import("./db.server");
+    return testRawConnectionString(data.connectionString);
+  });

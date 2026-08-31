@@ -171,15 +171,30 @@ function SelfHostedTab() {
   }
 
   async function testConnection() {
-    if (!companyId) return;
     setTesting(true);
     setTestResult(null);
     try {
-      const res = await query("SELECT 1 AS ok", [], companyId);
-      if (res.error) {
-        setTestResult({ ok: false, msg: res.error.message });
+      // If there's a typed string, test it directly (pre-save validation)
+      if (connStr.trim()) {
+        const { testRawConnectionStringFn } = await import("@/lib/db.fn");
+        const res = await testRawConnectionStringFn({ data: { connectionString: connStr.trim() } });
+        if (res.error) {
+          setTestResult({ ok: false, msg: res.error.message });
+        } else if (res.ok) {
+          setTestResult({ ok: true, msg: "Connection successful — safe to save" });
+        } else {
+          setTestResult({ ok: false, msg: "Connection failed" });
+        }
+      } else if (companyId && hasConnStr) {
+        // Otherwise test the stored (saved) connection
+        const res = await query("SELECT 1 AS ok", [], companyId);
+        if (res.error) {
+          setTestResult({ ok: false, msg: res.error.message });
+        } else {
+          setTestResult({ ok: true, msg: "Stored connection is working" });
+        }
       } else {
-        setTestResult({ ok: true, msg: "Connection successful" });
+        setTestResult({ ok: false, msg: "Enter a connection string first" });
       }
     } catch (err: any) {
       setTestResult({ ok: false, msg: err.message ?? "Connection failed" });
@@ -255,7 +270,7 @@ function SelfHostedTab() {
           <Button onClick={save} disabled={!connStr.trim() || saving}>
             {saving ? "Saving…" : "Save (Encrypted)"}
           </Button>
-          <Button variant="outline" onClick={testConnection} disabled={testing || !hasConnStr}>
+          <Button variant="outline" onClick={testConnection} disabled={testing || (!connStr.trim() && !hasConnStr)}>
             {testing ? "Testing…" : "Test Connection"}
           </Button>
         </div>
