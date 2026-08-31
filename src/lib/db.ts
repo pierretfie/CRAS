@@ -9,8 +9,8 @@ import { dbQueryFn } from "./db.fn";
 export async function query(text: string, params?: any[], companyId?: string | null) {
   const apiUrl = (import.meta as any).env?.VITE_API_URL as string | undefined;
 
-  // Remote middleware (Fly) — no local DB needed
-  if (apiUrl) {
+  // Remote middleware (Fly) — only on client (browser), server uses local pool
+  if (apiUrl && typeof window !== "undefined") {
     try {
       const res = await fetch(`${apiUrl.replace(/\/$/, "")}/api/db`, {
         method: "POST",
