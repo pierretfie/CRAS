@@ -7,6 +7,9 @@ RUN npm install
 
 # Copy source and build
 COPY . .
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_PUBLISHABLE_KEY
+ARG VITE_SUPABASE_PROJECT_ID
 RUN npm run build
 
 # Production image
