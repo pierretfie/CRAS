@@ -207,6 +207,7 @@ function SelfHostedTab() {
               placeholder="postgresql://username:password@your-host:5432/your-database?sslmode=require"
               value={connStr}
               onChange={(e) => setConnStr(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}
               className="text-base py-6 font-mono"
             />
           </div>
