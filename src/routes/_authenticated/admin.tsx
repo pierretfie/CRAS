@@ -94,7 +94,8 @@ function SelfHostedTab() {
   const qc = useQueryClient();
   const { data: me } = useCurrentUser();
   const companyId = me?.company?.id ?? "";
-  const [connStr, setConnStr] = useState("");
+  const connStrRef = useRef("");
+  const inputRef = useRef<HTMLInputElement>(null);
   const [revealed, setRevealed] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -113,14 +114,16 @@ function SelfHostedTab() {
   const hasConnStr = !!(company as any)?.connection_string;
 
   async function save() {
-    if (!connStr.trim() || !companyId) return;
+    const value = connStrRef.current;
+    if (!value.trim() || !companyId) return;
     setSaving(true);
     try {
       const { saveConnectionStringFn } = await import("@/lib/db.fn");
-      const res = await saveConnectionStringFn({ data: { companyId, connectionString: connStr.trim() } });
+      const res = await saveConnectionStringFn({ data: { companyId, connectionString: value.trim() } });
       if (res.error) throw new Error(res.error.message);
       toast.success("Connection string saved (encrypted)");
-      setConnStr("");
+      connStrRef.current = "";
+      if (inputRef.current) inputRef.current.value = "";
       qc.invalidateQueries({ queryKey: ["company", companyId] });
     } catch (err: any) {
       toast.error(err.message ?? "Failed to save");
@@ -203,10 +206,11 @@ function SelfHostedTab() {
           <Label className="text-base font-semibold">PostgreSQL Connection String</Label>
           <div className="relative">
             <Input
+              ref={inputRef}
               type="password"
               placeholder="postgresql://username:password@your-host:5432/your-database?sslmode=require"
-              value={connStr}
-              onChange={(e) => setConnStr(e.target.value)}
+              defaultValue=""
+              onChange={(e) => { connStrRef.current = e.target.value; }}
               onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}
               className="text-base py-6 font-mono"
             />
@@ -226,7 +230,7 @@ function SelfHostedTab() {
           <Button
             size="lg"
             onClick={save}
-            disabled={!connStr.trim() || saving}
+            disabled={saving}
             className="px-8"
           >
             {saving ? "Encrypting & Saving…" : "Save Connection String"}
