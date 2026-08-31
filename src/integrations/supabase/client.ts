@@ -2,38 +2,70 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-function createSupabaseClient() {
-  // Use import.meta.env for client-side (Vite build-time replacement)
-  // Fall back to process.env for SSR (server-side rendering)
-  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-  const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
+let _supabase: ReturnType<typeof createClient<Database>> | undefined;
+let _initPromise: Promise<ReturnType<typeof createClient<Database>>> | undefined;
 
-  if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-    const missing = [
-      ...(!SUPABASE_URL ? ['SUPABASE_URL'] : []),
-      ...(!SUPABASE_PUBLISHABLE_KEY ? ['SUPABASE_PUBLISHABLE_KEY'] : []),
-    ];
-    const message = `Missing Supabase environment variable(s): ${missing.join(', ')}. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY in your .env file.`;
+async function createSupabaseClientAsync(): Promise<ReturnType<typeof createClient<Database>>> {
+  let url: string | undefined = (import.meta as any).env?.VITE_SUPABASE_URL;
+  let key: string | undefined = (import.meta as any).env?.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+  // If not baked, fetch from middleware at runtime (so bundle only needs VITE_API_URL)
+  if ((!url || !key) && typeof window !== "undefined") {
+    const apiUrl = (import.meta as any).env?.VITE_API_URL as string | undefined;
+    if (apiUrl) {
+      try {
+        const res = await fetch(`${apiUrl.replace(/\/$/, "")}/api/config`);
+        if (res.ok) {
+          const json = await res.json();
+          url = json.url;
+          key = json.anonKey;
+        }
+      } catch (e) {
+        console.warn("[Supabase] Failed to fetch config from middleware:", e);
+      }
+    }
+  }
+
+  url = url || (process.env as any).SUPABASE_URL || (process.env as any).VITE_SUPABASE_URL;
+  key = key || (process.env as any).SUPABASE_PUBLISHABLE_KEY || (process.env as any).VITE_SUPABASE_PUBLISHABLE_KEY;
+
+  if (!url || !key) {
+    const missing = [...(!url ? ["SUPABASE_URL"] : []), ...(!key ? ["SUPABASE_PUBLISHABLE_KEY"] : [])];
+    const message = `Missing Supabase environment variable(s): ${missing.join(", ")}. Set VITE_API_URL in your .env and ensure middleware has SUPABASE_URL/PUBLISHABLE_KEY.`;
     console.error(`[Supabase] ${message}`);
     throw new Error(message);
   }
 
-  return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  return createClient<Database>(url, key, {
     auth: {
-      storage: typeof window !== 'undefined' ? localStorage : undefined,
+      storage: typeof window !== "undefined" ? localStorage : undefined,
       persistSession: true,
       autoRefreshToken: true,
-    }
+    },
   });
 }
 
-let _supabase: ReturnType<typeof createSupabaseClient> | undefined;
+export async function initSupabase(): Promise<ReturnType<typeof createClient<Database>>> {
+  if (_supabase) return _supabase;
+  if (_initPromise) return _initPromise;
+  _initPromise = createSupabaseClientAsync().then((c) => {
+    _supabase = c;
+    return c;
+  });
+  return _initPromise;
+}
 
-// Import the supabase client like this:
-// import { supabase } from "@/integrations/supabase/client";
-export const supabase = new Proxy({} as ReturnType<typeof createSupabaseClient>, {
-  get(_, prop, receiver) {
-    if (!_supabase) _supabase = createSupabaseClient();
-    return Reflect.get(_supabase, prop, receiver);
+function getSupabase(): ReturnType<typeof createClient<Database>> {
+  if (!_supabase) {
+    throw new Error("Supabase not initialized. Call initSupabase() in root loader first.");
+  }
+  return _supabase;
+}
+
+// Proxy that ensures init before any property access (for backwards compat)
+export const supabase = new Proxy({} as ReturnType<typeof createClient<Database>>, {
+  get(_target, prop: string | symbol, _receiver) {
+    const client = getSupabase();
+    return Reflect.get(client as any, prop);
   },
 });

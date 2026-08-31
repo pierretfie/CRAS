@@ -69,6 +69,11 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+  loader: async () => {
+    const { initSupabase } = await import("@/integrations/supabase/client");
+    await initSupabase();
+    return null;
+  },
   head: () => ({
     meta: [
       { charSet: "utf-8" },
