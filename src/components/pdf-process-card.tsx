@@ -21,7 +21,6 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { compileLatexToPdf } from "@/lib/api/ai.functions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -231,6 +230,13 @@ export function PdfProcessCard({
   async function getPdf(): Promise<string> {
     if (precompiledPdf) return precompiledPdf;
     if (!latex) throw new Error("No LaTeX source available");
+    const apiUrl = (import.meta as any).env?.VITE_API_URL as string | undefined;
+    if (apiUrl && typeof window !== "undefined") {
+      const { callViaProxy } = await import("@/lib/remote");
+      const res: any = await callViaProxy("compileLatexToPdf", { latex });
+      return res.pdf;
+    }
+    const { compileLatexToPdf } = await import("@/lib/api/ai.functions");
     const { pdf } = await compileLatexToPdf({ data: { latex } });
     return pdf;
   }

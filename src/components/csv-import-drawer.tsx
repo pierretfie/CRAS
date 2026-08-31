@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { query } from "@/lib/db";
 import { parseCsv, ParsedClient, CSV_TEMPLATE_EXAMPLE } from "@/lib/csv-parser";
-import { batchNormalizeClients } from "@/lib/api/ai.functions";
 import { createFollowUp, suggestFrequency } from "@/lib/follow-ups";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import {
@@ -168,19 +167,26 @@ export function CsvImportDrawer({ open, onClose, onImported }: CsvImportDrawerPr
     stages?.forEach(s => { stageLabels[String(s.stage_number)] = s.label; });
 
     try {
-      const normalized = await batchNormalizeClients({
-        data: {
-          rows: valid.map(r => ({
-            name: r.name,
-            category: r.category,
-            modeOfConnection: r.mode_of_connection,
-            stage: r.stage,
-            stageNotes: r.stage_notes,
-            interestScale: r.interest_scale,
-          })),
-          stageLabels,
-        },
-      });
+      const data = {
+        rows: valid.map(r => ({
+          name: r.name,
+          category: r.category,
+          modeOfConnection: r.mode_of_connection,
+          stage: r.stage,
+          stageNotes: r.stage_notes,
+          interestScale: r.interest_scale,
+        })),
+        stageLabels,
+      };
+      const apiUrl = (import.meta as any).env?.VITE_API_URL as string | undefined;
+      let normalized: any;
+      if (apiUrl && typeof window !== "undefined") {
+        const { callViaProxy } = await import("@/lib/remote");
+        normalized = await callViaProxy("batchNormalizeClients", data);
+      } else {
+        const { batchNormalizeClients } = await import("@/lib/api/ai.functions");
+        normalized = await batchNormalizeClients({ data });
+      }
 
       setRows(
         valid.map((r, i) => {

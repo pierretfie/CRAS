@@ -64,7 +64,6 @@ import { Plus, Trash2, Send, Bot, User, ShieldAlert, Loader2, FileText, Copy, Sq
 import { toast } from "sonner";
 import { useAnalyticsData } from "@/hooks/use-analytics-data";
 import { Markdown } from "@/components/markdown";
-import { compileLatexToPdf } from "@/lib/api/ai.functions";
 import { buildAnalyticsContext } from "@/lib/ai-context";
 import type { ThinkingLevel } from "@/lib/ai-nvidia.server";
 import { PdfProcessCard } from "@/components/pdf-process-card";
@@ -147,7 +146,7 @@ function SelfHostedTab() {
     try {
       const apiUrl = (import.meta as any).env?.VITE_API_URL as string | undefined;
       let res: any;
-      if (apiUrl) {
+      if (apiUrl && typeof window !== "undefined") {
         const r = await fetch(`${apiUrl.replace(/\/$/, "")}/api/save-connection-string`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -172,8 +171,16 @@ function SelfHostedTab() {
   async function reveal() {
     if (!companyId) return;
     try {
-      const { revealConnectionStringFn } = await import("@/lib/db.fn");
-      const res = await revealConnectionStringFn({ data: { companyId } });
+      const data = { companyId };
+      const apiUrl = (import.meta as any).env?.VITE_API_URL as string | undefined;
+      let res: any;
+      if (apiUrl && typeof window !== "undefined") {
+        const { callViaProxy } = await import("@/lib/remote");
+        res = await callViaProxy("revealConnectionString", data);
+      } else {
+        const { revealConnectionStringFn } = await import("@/lib/db.fn");
+        res = await revealConnectionStringFn({ data });
+      }
       if (res.error) throw new Error(res.error.message);
       setRevealed(res.data ?? "No connection string set");
     } catch (err: any) {
@@ -187,8 +194,16 @@ function SelfHostedTab() {
     try {
       // If there's a typed string, test it directly (pre-save validation)
       if (connStr.trim()) {
-        const { testRawConnectionStringFn } = await import("@/lib/db.fn");
-        const res = await testRawConnectionStringFn({ data: { connectionString: connStr.trim() } });
+        const data = { connectionString: connStr.trim() };
+        const apiUrl = (import.meta as any).env?.VITE_API_URL as string | undefined;
+        let res: any;
+        if (apiUrl && typeof window !== "undefined") {
+          const { callViaProxy } = await import("@/lib/remote");
+          res = await callViaProxy("testRawConnectionString", data);
+        } else {
+          const { testRawConnectionStringFn } = await import("@/lib/db.fn");
+          res = await testRawConnectionStringFn({ data });
+        }
         if (res.error) {
           setTestResult({ ok: false, msg: res.error.message });
         } else if (res.ok) {
@@ -357,16 +372,22 @@ function UsersTab() {
     if (!me?.profile?.company_id) return toast.error("Company not found — cannot create user");
     setCreating(true);
     try {
-      const { adminCreateUserInCompany } = await import("@/lib/api/admin.functions");
-      const result = await adminCreateUserInCompany({
-        data: {
-          name: createForm.name.trim(),
-          email: createForm.email.trim(),
-          department: createForm.department.trim() || undefined,
-          role: createForm.role,
-          companyId: me.profile.company_id,
-        },
-      });
+      const data = {
+        name: createForm.name.trim(),
+        email: createForm.email.trim(),
+        department: createForm.department.trim() || undefined,
+        role: createForm.role,
+        companyId: me.profile.company_id,
+      };
+      const apiUrl = (import.meta as any).env?.VITE_API_URL as string | undefined;
+      let result: any;
+      if (apiUrl && typeof window !== "undefined") {
+        const { callViaProxy } = await import("@/lib/remote");
+        result = await callViaProxy("adminCreateUserInCompany", data);
+      } else {
+        const { adminCreateUserInCompany } = await import("@/lib/api/admin.functions");
+        result = await adminCreateUserInCompany({ data });
+      }
       setCreatedResult({ email: result.email, generatedPassword: result.generatedPassword });
       setCreateForm({ name: "", email: "", department: "", role: "user" });
       toast.success("User created");
@@ -482,8 +503,15 @@ function UserRow({ u, isSelf, onRefetch, companyId }: { u: any; isSelf: boolean;
 
       // Update email via admin API if it changed
       if (form.email.trim().toLowerCase() !== (u.email ?? "").toLowerCase()) {
-        const { adminUpdateUserEmail } = await import("@/lib/api/admin.functions");
-        await adminUpdateUserEmail({ data: { userId: u.id, email: form.email.trim() } });
+        const data = { userId: u.id, email: form.email.trim() };
+        const apiUrl = (import.meta as any).env?.VITE_API_URL as string | undefined;
+        if (apiUrl && typeof window !== "undefined") {
+          const { callViaProxy } = await import("@/lib/remote");
+          await callViaProxy("adminUpdateUserEmail", data);
+        } else {
+          const { adminUpdateUserEmail } = await import("@/lib/api/admin.functions");
+          await adminUpdateUserEmail({ data });
+        }
       }
 
       toast.success("User updated");
@@ -523,8 +551,15 @@ function UserRow({ u, isSelf, onRefetch, companyId }: { u: any; isSelf: boolean;
 
   async function toggleActive() {
     try {
-      const { adminToggleUserActive } = await import("@/lib/api/admin.functions");
-      await adminToggleUserActive({ data: { userId: u.id, active: !u.active } });
+      const data = { userId: u.id, active: !u.active };
+      const apiUrl = (import.meta as any).env?.VITE_API_URL as string | undefined;
+      if (apiUrl && typeof window !== "undefined") {
+        const { callViaProxy } = await import("@/lib/remote");
+        await callViaProxy("adminToggleUserActive", data);
+      } else {
+        const { adminToggleUserActive } = await import("@/lib/api/admin.functions");
+        await adminToggleUserActive({ data });
+      }
       toast.success(u.active ? "User deactivated" : "User activated");
       onRefetch();
     } catch (err: any) {
@@ -662,17 +697,22 @@ function CompanyTab() {
     if (!me?.profile?.company_id) return toast.error("No company linked to your account");
     setSaving(true);
     try {
-      const { updateCompany } = await import("@/lib/api/admin.functions");
-      await updateCompany({
-        data: {
-          companyId: me.profile.company_id,
-          name: form.name.trim(),
-          industry: form.industry.trim() || undefined,
-          website: form.website.trim() || undefined,
-          phone: form.phone.trim() || undefined,
-          address: form.address.trim() || undefined,
-        },
-      });
+      const data = {
+        companyId: me.profile.company_id,
+        name: form.name.trim(),
+        industry: form.industry.trim() || undefined,
+        website: form.website.trim() || undefined,
+        phone: form.phone.trim() || undefined,
+        address: form.address.trim() || undefined,
+      };
+      const apiUrl = (import.meta as any).env?.VITE_API_URL as string | undefined;
+      if (apiUrl && typeof window !== "undefined") {
+        const { callViaProxy } = await import("@/lib/remote");
+        await callViaProxy("updateCompany", data);
+      } else {
+        const { updateCompany } = await import("@/lib/api/admin.functions");
+        await updateCompany({ data });
+      }
       toast.success("Company details updated");
       qc.invalidateQueries({ queryKey: ["current-user"] });
     } catch (err: any) {
@@ -1192,7 +1232,9 @@ function ConsoleTab() {
       let latexFullText = "";
       let answerStarted = false;
 
-      const res = await fetch("/api/chat-stream", {
+      const apiUrlForChat = (import.meta as any).env?.VITE_API_URL as string | undefined;
+      const chatUrl = apiUrlForChat && typeof window !== "undefined" ? `${apiUrlForChat.replace(/\/$/, "")}/api/chat-stream` : "/api/chat-stream";
+      const res = await fetch(chatUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1318,7 +1360,15 @@ function ConsoleTab() {
       );
 
       try {
-        const compiled = await compileLatexToPdf({ data: { latex: finalLatex } });
+        const apiUrlForPdf = (import.meta as any).env?.VITE_API_URL as string | undefined;
+        let compiled: any;
+        if (apiUrlForPdf && typeof window !== "undefined") {
+          const { callViaProxy } = await import("@/lib/remote");
+          compiled = await callViaProxy("compileLatexToPdf", { latex: finalLatex });
+        } else {
+          const { compileLatexToPdf: compileFn } = await import("@/lib/api/ai.functions");
+          compiled = await compileFn({ data: { latex: finalLatex } });
+        }
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantId

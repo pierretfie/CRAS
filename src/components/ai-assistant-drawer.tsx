@@ -320,7 +320,9 @@ export function AIAssistantDrawer() {
       let latexFullText = "";
       let answerStarted = false;
 
-      const res = await fetch("/api/chat-stream", {
+      const apiUrlForChat = (import.meta as any).env?.VITE_API_URL as string | undefined;
+      const chatUrl = apiUrlForChat && typeof window !== "undefined" ? `${apiUrlForChat.replace(/\/$/, "")}/api/chat-stream` : "/api/chat-stream";
+      const res = await fetch(chatUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -427,7 +429,6 @@ export function AIAssistantDrawer() {
         prev.map((m) => m.id === assistantId ? { ...m, pdfState: "processing" as PdfState } : m),
       );
 
-      const { compileLatexToPdf } = await import("@/lib/api/ai.functions");
       console.log("[PDF drawer] latexFullText length:", latexFullText.length);
 
       const { latex: finalLatex, filename: extractedFilename } = splitMessage(latexFullText);
@@ -448,7 +449,15 @@ export function AIAssistantDrawer() {
       );
       
       try {
-        const compiled = await compileLatexToPdf({ data: { latex: finalLatex } });
+        const apiUrlForPdf = (import.meta as any).env?.VITE_API_URL as string | undefined;
+        let compiled: any;
+        if (apiUrlForPdf && typeof window !== "undefined") {
+          const { callViaProxy } = await import("@/lib/remote");
+          compiled = await callViaProxy("compileLatexToPdf", { latex: finalLatex });
+        } else {
+          const { compileLatexToPdf } = await import("@/lib/api/ai.functions");
+          compiled = await compileLatexToPdf({ data: { latex: finalLatex } });
+        }
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantId

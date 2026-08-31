@@ -4,7 +4,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { query } from "@/lib/db";
 import { useState } from "react";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { normalizeClientData } from "@/lib/api/ai.functions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -130,16 +129,23 @@ function NewClient() {
     const stageLabel = stages?.find((s: any) => s.stage_number === form.stage)?.label ?? "";
     setNormalizing(true);
     try {
-      const result = await normalizeClientData({
-        data: {
-          category: cat,
-          modeOfConnection: mode,
-          stage: form.stage,
-          stageDescription: form.stage_notes,
-          stageLabel,
-          interestScale,
-        },
-      });
+      const data = {
+        category: cat,
+        modeOfConnection: mode,
+        stage: form.stage,
+        stageDescription: form.stage_notes,
+        stageLabel,
+        interestScale,
+      };
+      const apiUrl = (import.meta as any).env?.VITE_API_URL as string | undefined;
+      let result: any;
+      if (apiUrl && typeof window !== "undefined") {
+        const { callViaProxy } = await import("@/lib/remote");
+        result = await callViaProxy("normalizeClientData", data);
+      } else {
+        const { normalizeClientData } = await import("@/lib/api/ai.functions");
+        result = await normalizeClientData({ data });
+      }
       setPreview(result);
     } catch (err: unknown) {
       console.error(err);

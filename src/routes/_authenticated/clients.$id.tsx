@@ -16,7 +16,6 @@ import { InterestScaleSlider } from "@/components/interest-scale-slider";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { classifyStageValue } from "@/lib/utils";
-import { classifyStageValueAI } from "@/lib/api/ai.functions";
 import { createFollowUp, getActiveFollowUps, cancelFollowUp, completeFollowUp, FollowUp, suggestFrequency, isLoggedThisCycle, followUpStatusText } from "@/lib/follow-ups";
 import { useAuth } from "@/hooks/use-auth";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -778,15 +777,23 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
       const timeoutPromise = new Promise<never>((_, reject) => {
         timeoutId = setTimeout(() => reject(new Error("AI timeout")), 120000);
       });
-      const aiPromise = classifyStageValueAI({
-        data: {
-          description,
-          fromStage: client.current_stage,
-          toStage: toStage,
-          eventType: eventType,
-          interestScale,
-        },
-      });
+      const data = {
+        description,
+        fromStage: client.current_stage,
+        toStage: toStage,
+        eventType: eventType,
+        interestScale,
+      };
+      const apiUrl = (import.meta as any).env?.VITE_API_URL as string | undefined;
+      const aiPromise = (async () => {
+        if (apiUrl && typeof window !== "undefined") {
+          const { callViaProxy } = await import("@/lib/remote");
+          return await callViaProxy<{ stageValue: number; reasoning: string }>("classifyStageValueAI", data);
+        } else {
+          const { classifyStageValueAI } = await import("@/lib/api/ai.functions");
+          return await classifyStageValueAI({ data });
+        }
+      })();
       const result = await Promise.race([aiPromise, timeoutPromise]);
       clearTimeout(timeoutId!);
       setAiLoading(false);
