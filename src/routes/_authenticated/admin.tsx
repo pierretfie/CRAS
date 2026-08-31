@@ -292,7 +292,7 @@ function SelfHostedTab() {
         <TabsContent value="products"><div className="max-w-2xl"><ProductsTab /></div></TabsContent>
         <TabsContent value="stages"><div className="max-w-2xl"><StagesTab /></div></TabsContent>
         <TabsContent value="company"><div className="max-w-2xl"><CompanyTab /></div></TabsContent>
-        <TabsContent value="selfhosted" forceMount><div className="max-w-2xl"><SelfHostedTab /></div></TabsContent>
+        <TabsContent value="selfhosted"><div className="max-w-2xl"><SelfHostedTab /></div></TabsContent>
         <TabsContent value="console"><ConsoleTab /></TabsContent>
       </Tabs>
     </div>
