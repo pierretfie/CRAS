@@ -60,7 +60,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, Send, Bot, User, ShieldAlert, Loader2, FileText, Copy, Square, Pencil, Check, X, ShieldCheck, ShieldOff, RotateCcw, Brain, ChevronDown, ChevronRight, Building2, Globe, Phone, MapPin, Briefcase, Save, Pin, UsersRound } from "lucide-react";
+import { Plus, Trash2, Send, Bot, User, ShieldAlert, Loader2, FileText, Copy, Square, Pencil, Check, X, ShieldCheck, ShieldOff, RotateCcw, Brain, ChevronDown, ChevronRight, Building2, Globe, Phone, MapPin, Briefcase, Save, Pin, UsersRound, Database, Eye, EyeOff, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { useAnalyticsData } from "@/hooks/use-analytics-data";
 import { Markdown } from "@/components/markdown";
@@ -123,6 +123,7 @@ function SelfHostedTab() {
   const { data: me } = useCurrentUser();
   const companyId = me?.company?.id;
   const [connStr, setConnStr] = useState("");
+  const [showConnStr, setShowConnStr] = useState(false);
   const [revealed, setRevealed] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -214,17 +215,40 @@ function SelfHostedTab() {
           {hasConnStr && <p className="text-muted-foreground mt-1">Data is stored in your own PostgreSQL database.</p>}
         </div>
 
-        <div className="space-y-2">
-          <Label>Connection String</Label>
-          <Input
-            type="password"
-            placeholder="postgresql://user:password@host:5432/dbname?sslmode=require"
-            value={connStr}
-            onChange={(e) => setConnStr(e.target.value)}
-          />
-          <p className="text-xs text-muted-foreground">
-            Format: postgresql://user:password@host:5432/dbname?sslmode=require
-          </p>
+        <div className="space-y-3 rounded-lg border bg-muted/20 p-4">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 border border-primary/20">
+              <Database className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <Label className="text-sm font-semibold">Connection String</Label>
+              <p className="text-xs text-muted-foreground">Your PostgreSQL connection URI — encrypted before storing</p>
+            </div>
+            <Lock className="h-3.5 w-3.5 text-muted-foreground ml-auto" />
+          </div>
+          <div className="relative">
+            <Input
+              type={showConnStr ? "text" : "password"}
+              placeholder="postgresql://user:password@host:5432/dbname?sslmode=require"
+              value={connStr}
+              onChange={(e) => setConnStr(e.target.value)}
+              className="h-11 pr-10 font-mono text-sm bg-background border-primary/20 focus-visible:ring-primary/30"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-muted-foreground hover:text-foreground"
+              onClick={() => setShowConnStr(!showConnStr)}
+              tabIndex={-1}
+            >
+              {showConnStr ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </Button>
+          </div>
+          <div className="rounded-md bg-muted px-3 py-2.5 border">
+            <p className="text-xs font-medium mb-1">Format</p>
+            <code className="text-xs font-mono break-all text-muted-foreground">postgresql://user:password@host:5432/dbname?sslmode=require</code>
+          </div>
         </div>
 
         <div className="flex gap-2">
