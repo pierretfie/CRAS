@@ -77,7 +77,6 @@ END;
 $$;
 
 -- ── Helper: set_client_defaults() ──────────────────────────
--- Auto-sets company_id and created_by on client INSERT
 CREATE OR REPLACE FUNCTION public.set_client_defaults()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
@@ -114,7 +113,7 @@ CREATE TABLE public.profiles (
   department           TEXT,
   must_change_password BOOLEAN NOT NULL DEFAULT false,
   active               BOOLEAN NOT NULL DEFAULT true,
-  company_id           UUID NOT NULL REFERENCES public.companies(id) ON DELETE SET NULL,
+  company_id           UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   created_at           TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -161,7 +160,7 @@ CREATE TABLE public.clients (
   contact_person_phone   TEXT,
   contact_person_role    TEXT,
   product                TEXT,
-  company_id             UUID NOT NULL,
+  company_id             UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   parent_client_id       UUID REFERENCES public.clients(id) ON DELETE SET NULL
 );
 
@@ -185,6 +184,8 @@ CREATE TABLE public.client_interactions (
   note       TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE INDEX idx_client_interactions_client ON public.client_interactions(client_id);
 
 -- ── Client Stage Events ────────────────────────────────────
 CREATE TABLE public.client_stage_events (
@@ -214,7 +215,7 @@ CREATE TABLE public.admin_categories (
   id                UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   name              TEXT NOT NULL,
   created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
-  company_id        UUID NOT NULL,
+  company_id        UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   pinned_to_sidebar BOOLEAN NOT NULL DEFAULT false,
   enable_subclients BOOLEAN NOT NULL DEFAULT false,
   UNIQUE (name, company_id)
@@ -227,7 +228,7 @@ CREATE TABLE public.admin_products (
   id         UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   name       TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  company_id UUID NOT NULL,
+  company_id UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   UNIQUE (name, company_id)
 );
 
@@ -241,7 +242,7 @@ CREATE TABLE public.conversion_stage_config (
   description  TEXT,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-  company_id   UUID NOT NULL,
+  company_id   UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   UNIQUE (company_id, stage_number)
 );
 
@@ -296,7 +297,7 @@ CREATE INDEX idx_follow_up_logs_activity_type
 CREATE TABLE public.notifications (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id     UUID NOT NULL,
-  company_id  UUID NOT NULL,
+  company_id  UUID NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
   type        TEXT NOT NULL,
   title       TEXT NOT NULL,
   body        TEXT NOT NULL,
@@ -492,36 +493,36 @@ CREATE POLICY "postgres bypass" ON public.client_access_requests
 
 -- ============================================================
 -- GRANTS
--- Permissions for Supabase-compatible roles.
--- For self-hosted: the CRAS server connects as postgres (bypasses RLS).
--- These grants are included for completeness and future PostgREST use.
+-- CRAS server connects as postgres (bypasses RLS).
+-- Only authenticated and service_role need table access.
+-- anon role excluded — no unauthenticated access to business data.
 -- ============================================================
 
-GRANT USAGE ON SCHEMA public TO postgres, anon, authenticated, service_role;
+GRANT USAGE ON SCHEMA public TO postgres, authenticated, service_role;
 
-GRANT ALL ON TABLE public.companies TO anon, authenticated, service_role;
-GRANT ALL ON TABLE public.profiles TO anon, authenticated, service_role;
-GRANT ALL ON TABLE public.user_roles TO anon, authenticated, service_role;
-GRANT ALL ON TABLE public.clients TO anon, authenticated, service_role;
-GRANT ALL ON TABLE public.client_interactions TO anon, authenticated, service_role;
-GRANT ALL ON TABLE public.client_stage_events TO anon, authenticated, service_role;
-GRANT ALL ON TABLE public.admin_categories TO anon, authenticated, service_role;
-GRANT ALL ON TABLE public.admin_products TO anon, authenticated, service_role;
-GRANT ALL ON TABLE public.conversion_stage_config TO anon, authenticated, service_role;
-GRANT ALL ON TABLE public.client_follow_ups TO anon, authenticated, service_role;
-GRANT ALL ON TABLE public.follow_up_logs TO anon, authenticated, service_role;
-GRANT ALL ON TABLE public.notifications TO anon, authenticated, service_role;
-GRANT ALL ON TABLE public.client_access_requests TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.companies TO authenticated, service_role;
+GRANT ALL ON TABLE public.profiles TO authenticated, service_role;
+GRANT ALL ON TABLE public.user_roles TO authenticated, service_role;
+GRANT ALL ON TABLE public.clients TO authenticated, service_role;
+GRANT ALL ON TABLE public.client_interactions TO authenticated, service_role;
+GRANT ALL ON TABLE public.client_stage_events TO authenticated, service_role;
+GRANT ALL ON TABLE public.admin_categories TO authenticated, service_role;
+GRANT ALL ON TABLE public.admin_products TO authenticated, service_role;
+GRANT ALL ON TABLE public.conversion_stage_config TO authenticated, service_role;
+GRANT ALL ON TABLE public.client_follow_ups TO authenticated, service_role;
+GRANT ALL ON TABLE public.follow_up_logs TO authenticated, service_role;
+GRANT ALL ON TABLE public.notifications TO authenticated, service_role;
+GRANT ALL ON TABLE public.client_access_requests TO authenticated, service_role;
 
 GRANT ALL ON FUNCTION public.has_role(uuid, public.app_role) TO authenticated, service_role;
-GRANT ALL ON FUNCTION public.is_company_admin() TO anon, authenticated, service_role;
-GRANT ALL ON FUNCTION public.is_super_admin() TO anon, authenticated, service_role;
-GRANT ALL ON FUNCTION public.my_company_id() TO anon, authenticated, service_role;
-GRANT ALL ON FUNCTION public.set_client_defaults() TO anon, authenticated, service_role;
+GRANT ALL ON FUNCTION public.is_company_admin() TO authenticated, service_role;
+GRANT ALL ON FUNCTION public.is_super_admin() TO authenticated, service_role;
+GRANT ALL ON FUNCTION public.my_company_id() TO authenticated, service_role;
+GRANT ALL ON FUNCTION public.set_client_defaults() TO authenticated, service_role;
 
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
-  GRANT ALL ON TABLES TO postgres, anon, authenticated, service_role;
+  GRANT ALL ON TABLES TO postgres, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
-  GRANT ALL ON SEQUENCES TO postgres, anon, authenticated, service_role;
+  GRANT ALL ON SEQUENCES TO postgres, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
-  GRANT ALL ON FUNCTIONS TO postgres, anon, authenticated, service_role;
+  GRANT ALL ON FUNCTIONS TO postgres, authenticated, service_role;
