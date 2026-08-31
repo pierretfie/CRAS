@@ -230,8 +230,8 @@ function SelfHostedTab() {
           {hasConnStr && <p className="text-muted-foreground mt-1">Data is stored in your own PostgreSQL database.</p>}
         </div>
 
-        <div className="rounded-md border bg-blue-50 dark:bg-blue-950/20 p-3 text-xs space-y-1">
-          <p className="font-medium flex items-center gap-1.5"><Info className="h-3 w-3" /> How to get your URI</p>
+        <div className="rounded-md border border-primary/20 bg-primary/5 p-3 text-xs space-y-1 text-foreground">
+          <p className="font-medium flex items-center gap-1.5"><Info className="h-3 w-3 text-primary" /> How to get your URI</p>
           <p><span className="font-medium">Supabase / Neon:</span> Dashboard → Database → Connection string → <span className="font-medium">Pooler</span> (port 5432) — don't use Direct.</p>
           <p><span className="font-medium">DigitalOcean / RDS / self-hosted:</span> Copy URI from your provider as shown.</p>
         </div>
