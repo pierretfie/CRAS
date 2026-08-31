@@ -21,7 +21,6 @@ RETURNS TRIGGER LANGUAGE plpgsql SET search_path = public AS $$
 BEGIN NEW.updated_at = now(); RETURN NEW; END; $$;
 
 -- ── Helper: my_company_id() ────────────────────────────────
--- Returns the company_id of the authenticated user (fast, cached per transaction)
 CREATE OR REPLACE FUNCTION public.my_company_id()
 RETURNS UUID LANGUAGE SQL STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT company_id FROM public.profiles WHERE id = auth.uid()
@@ -77,6 +76,17 @@ BEGIN
 END;
 $$;
 
+-- ── Helper: set_client_defaults() ──────────────────────────
+-- Auto-sets company_id and created_by on client INSERT
+CREATE OR REPLACE FUNCTION public.set_client_defaults()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  NEW.company_id := my_company_id();
+  NEW.created_by := auth.uid();
+  RETURN NEW;
+END;
+$$;
+
 -- ── Companies ──────────────────────────────────────────────
 CREATE TABLE public.companies (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -97,10 +107,6 @@ CREATE TRIGGER update_companies_updated_at
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 -- ── Profiles ───────────────────────────────────────────────
--- NOTE: id references auth.users in Supabase. For self-hosted,
--- the CRAS server manages auth centrally and passes user_id as
--- a plain UUID. The FK is kept for reference but will only work
--- if you have an auth schema with an auth.users table.
 CREATE TABLE public.profiles (
   id                   UUID NOT NULL PRIMARY KEY,
   name                 TEXT NOT NULL,
@@ -162,6 +168,10 @@ CREATE TABLE public.clients (
 CREATE TRIGGER update_clients_updated_at
   BEFORE UPDATE ON public.clients
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+CREATE TRIGGER clients_set_defaults
+  BEFORE INSERT ON public.clients
+  FOR EACH ROW EXECUTE FUNCTION public.set_client_defaults();
 
 CREATE INDEX idx_clients_company ON public.clients(company_id);
 CREATE INDEX idx_clients_product ON public.clients(product);
@@ -261,6 +271,8 @@ CREATE TRIGGER set_client_follow_ups_updated_at
 
 CREATE INDEX idx_client_follow_ups_user_status ON public.client_follow_ups(user_id, status);
 CREATE INDEX idx_client_follow_ups_next_reminder ON public.client_follow_ups(next_reminder) WHERE status = 'active';
+CREATE INDEX idx_client_follow_ups_client_id ON public.client_follow_ups(client_id);
+CREATE INDEX idx_client_follow_ups_user_id ON public.client_follow_ups(user_id);
 
 -- ── Follow-up Logs ─────────────────────────────────────────
 CREATE TABLE public.follow_up_logs (
@@ -275,6 +287,7 @@ CREATE TABLE public.follow_up_logs (
 
 CREATE INDEX idx_follow_up_logs_client ON public.follow_up_logs(client_id);
 CREATE INDEX idx_follow_up_logs_follow_up ON public.follow_up_logs(follow_up_id);
+CREATE INDEX idx_follow_up_logs_user_id ON public.follow_up_logs(user_id);
 CREATE INDEX idx_follow_up_logs_activity_type
   ON public.follow_up_logs(activity_type)
   WHERE activity_type IS NOT NULL;
@@ -326,7 +339,6 @@ CREATE INDEX idx_access_requests_requester ON public.client_access_requests(requ
 -- ROW LEVEL SECURITY POLICIES
 -- These protect data when accessed via PostgREST/Supabase client.
 -- When CRAS server connects as postgres role, RLS is bypassed.
--- Included for completeness and future-proofing.
 -- ============================================================
 
 ALTER TABLE public.companies ENABLE ROW LEVEL SECURITY;
@@ -386,6 +398,8 @@ CREATE POLICY "interactions_read" ON public.client_interactions FOR SELECT TO au
 CREATE POLICY "interactions_insert" ON public.client_interactions FOR INSERT TO authenticated
   WITH CHECK (user_id = auth.uid()
     AND EXISTS (SELECT 1 FROM public.clients c WHERE c.id = client_id AND c.company_id = public.my_company_id()));
+CREATE POLICY "postgres bypass" ON public.client_interactions
+  FOR ALL TO postgres USING (true) WITH CHECK (true);
 
 -- ── client_stage_events ──
 CREATE POLICY "events_read" ON public.client_stage_events FOR SELECT TO authenticated
@@ -473,3 +487,41 @@ CREATE POLICY "access_requests_insert" ON public.client_access_requests FOR INSE
     AND EXISTS (SELECT 1 FROM public.clients c WHERE c.id = client_id AND c.company_id = public.my_company_id()));
 CREATE POLICY "access_requests_update" ON public.client_access_requests FOR UPDATE TO authenticated
   USING (owner_id = auth.uid() OR public.is_company_admin() OR public.is_super_admin());
+CREATE POLICY "postgres bypass" ON public.client_access_requests
+  FOR ALL TO postgres USING (true) WITH CHECK (true);
+
+-- ============================================================
+-- GRANTS
+-- Permissions for Supabase-compatible roles.
+-- For self-hosted: the CRAS server connects as postgres (bypasses RLS).
+-- These grants are included for completeness and future PostgREST use.
+-- ============================================================
+
+GRANT USAGE ON SCHEMA public TO postgres, anon, authenticated, service_role;
+
+GRANT ALL ON TABLE public.companies TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.profiles TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.user_roles TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.clients TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.client_interactions TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.client_stage_events TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.admin_categories TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.admin_products TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.conversion_stage_config TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.client_follow_ups TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.follow_up_logs TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.notifications TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.client_access_requests TO anon, authenticated, service_role;
+
+GRANT ALL ON FUNCTION public.has_role(uuid, public.app_role) TO authenticated, service_role;
+GRANT ALL ON FUNCTION public.is_company_admin() TO anon, authenticated, service_role;
+GRANT ALL ON FUNCTION public.is_super_admin() TO anon, authenticated, service_role;
+GRANT ALL ON FUNCTION public.my_company_id() TO anon, authenticated, service_role;
+GRANT ALL ON FUNCTION public.set_client_defaults() TO anon, authenticated, service_role;
+
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+  GRANT ALL ON TABLES TO postgres, anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+  GRANT ALL ON SEQUENCES TO postgres, anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+  GRANT ALL ON FUNCTIONS TO postgres, anon, authenticated, service_role;
