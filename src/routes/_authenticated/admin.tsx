@@ -90,12 +90,39 @@ function AdminPage() {
   );
 }
 
+  return (
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Admin Panel</h1>
+        <p className="text-sm text-muted-foreground">Manage workspace configuration</p>
+      </div>
+      <Tabs defaultValue="users">
+        <TabsList className="grid grid-cols-7 max-w-3xl">
+          <TabsTrigger value="users">Users</TabsTrigger>
+          <TabsTrigger value="categories">Categories</TabsTrigger>
+          <TabsTrigger value="products">Products</TabsTrigger>
+          <TabsTrigger value="stages">Stages</TabsTrigger>
+          <TabsTrigger value="company">Company</TabsTrigger>
+          <TabsTrigger value="selfhosted">Self-Hosted</TabsTrigger>
+          <TabsTrigger value="console">AI Console</TabsTrigger>
+        </TabsList>
+        <TabsContent value="users"><div className="max-w-4xl"><UsersTab /></div></TabsContent>
+        <TabsContent value="categories"><div className="max-w-2xl"><CategoriesTab /></div></TabsContent>
+        <TabsContent value="products"><div className="max-w-2xl"><ProductsTab /></div></TabsContent>
+        <TabsContent value="stages"><div className="max-w-2xl"><StagesTab /></div></TabsContent>
+        <TabsContent value="company"><div className="max-w-2xl"><CompanyTab /></div></TabsContent>
+        <TabsContent value="selfhosted"><div className="max-w-2xl"><SelfHostedTab /></div></TabsContent>
+        <TabsContent value="console"><ConsoleTab /></TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
 function SelfHostedTab() {
   const qc = useQueryClient();
   const { data: me } = useCurrentUser();
-  const companyId = me?.company?.id ?? "";
-  const connStrRef = useRef("");
-  const inputRef = useRef<HTMLInputElement>(null);
+  const companyId = me?.company?.id;
+  const [connStr, setConnStr] = useState("");
   const [revealed, setRevealed] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -114,16 +141,14 @@ function SelfHostedTab() {
   const hasConnStr = !!(company as any)?.connection_string;
 
   async function save() {
-    const value = connStrRef.current;
-    if (!value.trim() || !companyId) return;
+    if (!connStr.trim() || !companyId) return;
     setSaving(true);
     try {
       const { saveConnectionStringFn } = await import("@/lib/db.fn");
-      const res = await saveConnectionStringFn({ data: { companyId, connectionString: value.trim() } });
+      const res = await saveConnectionStringFn({ data: { companyId, connectionString: connStr.trim() } });
       if (res.error) throw new Error(res.error.message);
       toast.success("Connection string saved (encrypted)");
-      connStrRef.current = "";
-      if (inputRef.current) inputRef.current.value = "";
+      setConnStr("");
       qc.invalidateQueries({ queryKey: ["company", companyId] });
     } catch (err: any) {
       toast.error(err.message ?? "Failed to save");
@@ -180,127 +205,60 @@ function SelfHostedTab() {
       <CardHeader>
         <CardTitle>Self-Hosted Database</CardTitle>
         <CardDescription>
-          Connect CRAS to your own PostgreSQL database. Your data stays on your server.
+          Connect CRAS to an external PostgreSQL database. The connection string is encrypted before storing.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Status banner */}
-        <div className={`rounded-lg p-4 border-2 ${hasConnStr ? "border-green-300 bg-green-50" : "border-muted bg-muted/50"}`}>
-          <div className="flex items-center gap-3">
-            <div className={`h-3 w-3 rounded-full ${hasConnStr ? "bg-green-500" : "bg-muted-foreground/40"}`} />
-            <div>
-              <p className="font-semibold text-lg">
-                {hasConnStr ? "External Database Connected" : "Using Central Database"}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {hasConnStr
-                  ? "Your data is stored in your own PostgreSQL database."
-                  : "Your data is stored on CRAS servers. Enter a connection string below to move to your own database."}
-              </p>
-            </div>
-          </div>
+      <CardContent className="space-y-4">
+        <div className="rounded-md bg-muted p-3 text-sm">
+          <p className="font-medium">Status: {hasConnStr ? "External database connected" : "Using central database (hosted by CRAS)"}</p>
+          {hasConnStr && <p className="text-muted-foreground mt-1">Data is stored in your own PostgreSQL database.</p>}
         </div>
 
-        {/* Connection string input */}
-        <div className="space-y-3">
-          <Label className="text-base font-semibold">PostgreSQL Connection String</Label>
-          <div className="relative">
-            <Input
-              ref={inputRef}
-              type="password"
-              placeholder="postgresql://username:password@your-host:5432/your-database?sslmode=require"
-              defaultValue=""
-              onChange={(e) => { connStrRef.current = e.target.value; }}
-              onKeyDown={(e) => e.key === "Enter" && e.preventDefault()}
-              className="text-base py-6 font-mono"
-            />
-          </div>
-          <div className="rounded-md bg-blue-50 border border-blue-200 p-3 text-sm text-blue-800">
-            <p className="font-medium">Where to find this:</p>
-            <ul className="list-disc list-inside mt-1 space-y-1 text-blue-700">
-              <li><strong>Supabase:</strong> Settings → Database → Connection string → URI</li>
-              <li><strong>DigitalOcean:</strong> Database dashboard → Connection Details → URI</li>
-              <li><strong>Neon / Railway / Render:</strong> Dashboard → Connection string</li>
-            </ul>
-          </div>
+        <div className="space-y-2">
+          <Label>Connection String</Label>
+          <Input
+            type="password"
+            placeholder="postgresql://user:password@host:5432/dbname?sslmode=require"
+            value={connStr}
+            onChange={(e) => setConnStr(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">
+            Format: postgresql://user:password@host:5432/dbname?sslmode=require
+          </p>
         </div>
 
-        {/* Action buttons */}
-        <div className="flex gap-3">
-          <Button
-            size="lg"
-            onClick={save}
-            disabled={saving}
-            className="px-8"
-          >
-            {saving ? "Encrypting & Saving…" : "Save Connection String"}
+        <div className="flex gap-2">
+          <Button onClick={save} disabled={!connStr.trim() || saving}>
+            {saving ? "Saving…" : "Save (Encrypted)"}
           </Button>
-          {hasConnStr && (
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={testConnection}
-              disabled={testing}
-            >
-              {testing ? "Testing…" : "Test Connection"}
-            </Button>
-          )}
+          <Button variant="outline" onClick={testConnection} disabled={testing || !hasConnStr}>
+            {testing ? "Testing…" : "Test Connection"}
+          </Button>
         </div>
 
-        {/* Test result */}
         {testResult && (
-          <div className={`rounded-lg p-4 border-2 text-sm font-medium ${testResult.ok ? "border-green-300 bg-green-50 text-green-800" : "border-red-300 bg-red-50 text-red-800"}`}>
-            {testResult.ok ? "✓ " : "✗ "}{testResult.msg}
+          <div className={`rounded-md p-3 text-sm ${testResult.ok ? "bg-green-50 text-green-700 border border-green-200" : "bg-destructive/10 text-destructive border border-destructive/20"}`}>
+            {testResult.msg}
           </div>
         )}
 
-        {/* Existing connection management */}
         {hasConnStr && (
-          <div className="border-t pt-4 space-y-3">
-            <p className="text-sm font-medium text-muted-foreground">Manage Connection</p>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => { if (revealed) { setRevealed(null); } else { reveal(); } }}>
-                {revealed ? "Hide Connection String" : "Reveal Connection String"}
+          <div className="space-y-2 border-t pt-4">
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={reveal}>
+                {revealed ? "Hide" : "Reveal Connection String"}
               </Button>
               <Button variant="destructive" size="sm" onClick={remove}>
-                Remove Connection String
+                Remove
               </Button>
             </div>
             {revealed && (
-              <pre className="rounded-lg bg-muted p-4 text-xs font-mono break-all whitespace-pre-wrap border">{revealed}</pre>
+              <pre className="rounded-md bg-muted p-3 text-xs font-mono break-all whitespace-pre-wrap">{revealed}</pre>
             )}
           </div>
         )}
       </CardContent>
     </Card>
-  );
-}
-
-  return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Admin Panel</h1>
-        <p className="text-sm text-muted-foreground">Manage workspace configuration</p>
-      </div>
-      <Tabs defaultValue="users">
-        <TabsList className="grid grid-cols-7 max-w-3xl">
-          <TabsTrigger value="users">Users</TabsTrigger>
-          <TabsTrigger value="categories">Categories</TabsTrigger>
-          <TabsTrigger value="products">Products</TabsTrigger>
-          <TabsTrigger value="stages">Stages</TabsTrigger>
-          <TabsTrigger value="company">Company</TabsTrigger>
-          <TabsTrigger value="selfhosted">Self-Hosted</TabsTrigger>
-          <TabsTrigger value="console">AI Console</TabsTrigger>
-        </TabsList>
-        <TabsContent value="users"><div className="max-w-4xl"><UsersTab /></div></TabsContent>
-        <TabsContent value="categories"><div className="max-w-2xl"><CategoriesTab /></div></TabsContent>
-        <TabsContent value="products"><div className="max-w-2xl"><ProductsTab /></div></TabsContent>
-        <TabsContent value="stages"><div className="max-w-2xl"><StagesTab /></div></TabsContent>
-        <TabsContent value="company"><div className="max-w-2xl"><CompanyTab /></div></TabsContent>
-        <TabsContent value="selfhosted"><div className="max-w-2xl"><SelfHostedTab /></div></TabsContent>
-        <TabsContent value="console"><ConsoleTab /></TabsContent>
-      </Tabs>
-    </div>
   );
 }
 
