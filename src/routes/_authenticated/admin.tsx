@@ -265,6 +265,7 @@ function SelfHostedTab() {
 function UsersTab() {
   const qc = useQueryClient();
   const { data: me } = useCurrentUser();
+  const companyId = me?.company?.id;
   const { data: users, refetch } = useQuery({
     queryKey: ["all-profiles", me?.company?.id],
     queryFn: async () => {
