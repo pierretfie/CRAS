@@ -9,16 +9,19 @@ async function createSupabaseClientAsync(): Promise<ReturnType<typeof createClie
   let url: string | undefined = (import.meta as any).env?.VITE_SUPABASE_URL;
   let key: string | undefined = (import.meta as any).env?.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-  // If not baked, fetch from middleware at runtime (so bundle only needs VITE_API_URL)
-  if ((!url || !key) && typeof window !== "undefined") {
-    const apiUrl = (import.meta as any).env?.VITE_API_URL as string | undefined;
+  // If not baked, fetch from middleware at runtime (so .env only needs VITE_API_URL)
+  if (!url || !key) {
+    const apiUrl =
+      (import.meta as any).env?.VITE_API_URL ||
+      (process.env as any).VITE_API_URL ||
+      (process.env as any).API_URL;
     if (apiUrl) {
       try {
         const res = await fetch(`${apiUrl.replace(/\/$/, "")}/api/config`);
         if (res.ok) {
           const json = await res.json();
-          url = json.url;
-          key = json.anonKey;
+          url = url || json.url;
+          key = key || json.anonKey;
         }
       } catch (e) {
         console.warn("[Supabase] Failed to fetch config from middleware:", e);
