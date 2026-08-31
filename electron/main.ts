@@ -253,8 +253,13 @@ function stopServer(): void {
 
 // ─── Create the main window ──────────────────────────────────────────────────
 async function createWindow(): Promise<void> {
-  // Start the server first
-  serverPort = await startServer();
+  // In production, load from Fly middleware (secrets stay server-side)
+  // In dev, start local server
+  if (!isDev) {
+    console.log("[Electron] Production: loading from Fly middleware");
+  } else {
+    serverPort = await startServer();
+  }
 
   // Create the browser window
   const iconPath = isDev
@@ -277,7 +282,7 @@ async function createWindow(): Promise<void> {
     show: true,
   });
 
-  const url = `http://127.0.0.1:${serverPort}`;
+  const url = isDev ? `http://127.0.0.1:${serverPort}` : `https://cras-middleware.fly.dev`;
   await mainWindow.loadURL(url);
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
