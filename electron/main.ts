@@ -254,26 +254,22 @@ function stopServer(): void {
 // ─── Create the main window ──────────────────────────────────────────────────
 async function createWindow(): Promise<void> {
   // One-time cleanup: remove old local secrets from previous installs
-  if (!isDev) {
-    try {
-      const oldEnv = path.join(process.resourcesPath, ".env");
-      if (fs.existsSync(oldEnv)) {
-        fs.unlinkSync(oldEnv);
-        console.log("[Electron] Cleaned up old resources/.env");
-      }
-      // Remove old bundled server that contained baked secrets (no longer used)
-      const oldServer = path.join(process.resourcesPath, "server");
-      if (fs.existsSync(oldServer)) {
-        fs.rmSync(oldServer, { recursive: true, force: true });
-        console.log("[Electron] Cleaned up old resources/server");
-      }
-    } catch (e) {
-      console.warn("[Electron] Cleanup failed:", e);
+  try {
+    const oldEnv = path.join(process.resourcesPath, ".env");
+    if (fs.existsSync(oldEnv)) {
+      fs.unlinkSync(oldEnv);
+      console.log("[Electron] Cleaned up old resources/.env");
     }
-    console.log("[Electron] Production: loading from Fly middleware");
-  } else {
-    serverPort = await startServer();
+    const oldServer = path.join(process.resourcesPath, "server");
+    if (fs.existsSync(oldServer)) {
+      fs.rmSync(oldServer, { recursive: true, force: true });
+      console.log("[Electron] Cleaned up old resources/server");
+    }
+  } catch (e) {
+    console.warn("[Electron] Cleanup failed:", e);
   }
+  console.log("[Electron] Loading from Fly middleware (no local DB)");
+  // No local server — all DB calls go through Fly
 
   // Create the browser window
   const iconPath = isDev
@@ -296,7 +292,7 @@ async function createWindow(): Promise<void> {
     show: true,
   });
 
-  const url = isDev ? `http://127.0.0.1:${serverPort}` : `https://cras-middleware.fly.dev`;
+  const url = `https://cras-middleware.fly.dev`;
   await mainWindow.loadURL(url);
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
