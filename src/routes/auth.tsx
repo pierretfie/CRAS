@@ -1,6 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -38,16 +37,22 @@ function AuthPage() {
       sessionStorage.removeItem("cras-idle-signout");
       setIdleSignOut(true);
     }
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) navigate({ to: "/analytics" });
-    });
+    import("@/integrations/supabase/client").then(({ initSupabase }) =>
+      initSupabase().then(({ auth }) =>
+        auth.getUser().then(({ data }) => {
+          if (data.user) navigate({ to: "/analytics" });
+        })
+      )
+    );
   }, [navigate]);
 
   async function handleSignIn(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
     const fd = new FormData(e.currentTarget);
-    const { error } = await supabase.auth.signInWithPassword({
+    const { initSupabase } = await import("@/integrations/supabase/client");
+    const client = await initSupabase();
+    const { error } = await client.auth.signInWithPassword({
       email: String(fd.get("email")),
       password: String(fd.get("password")),
     });
@@ -64,7 +69,9 @@ function AuthPage() {
     e.preventDefault();
     if (!resetEmail.trim()) return;
     setLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail.trim(), {
+    const { initSupabase } = await import("@/integrations/supabase/client");
+    const client = await initSupabase();
+    const { error } = await client.auth.resetPasswordForEmail(resetEmail.trim(), {
       redirectTo: `${window.location.origin}/change-password`,
     });
     setLoading(false);
