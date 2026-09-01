@@ -534,6 +534,19 @@ function UserRow({ u, isSelf, onRefetch, companyId }: { u: any; isSelf: boolean;
           <div className="text-xs text-muted-foreground truncate">
             {u.email}{u.department ? ` · ${u.department}` : ""}
           </div>
+          <div className="text-xs font-mono text-muted-foreground flex items-center gap-1">
+            <span className="truncate">{u.id}</span>
+            <button
+              onClick={async () => {
+                await navigator.clipboard.writeText(u.id);
+                toast.success("Copied ID");
+              }}
+              className="p-0.5 hover:text-foreground"
+              title="Copy user ID"
+            >
+              <Copy className="h-3 w-3" />
+            </button>
+          </div>
         </div>
         <div className="flex gap-1 shrink-0">
           {/* Edit */}

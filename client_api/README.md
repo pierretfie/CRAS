@@ -8,7 +8,7 @@ Push clients from an external form / service directly into CRAS.
 
 ## Getting `created_by`
 `created_by` must be a valid `profiles.id` from that `company_id`. Get it via:
-- Admin → Users → copy user ID, or
+- Admin → Users → copy ID (click copy icon next to the ID under each user), or
 - `SELECT id, name FROM profiles WHERE company_id='YOUR_COMPANY_ID';`
 
 If omitted, middleware falls back to first user in company — explicit is safer.
