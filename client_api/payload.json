@@ -1,0 +1,28 @@
+{
+  "name": "Acme Ltd",                          // required
+  "category": "Technology",                     // required
+  "mode_of_connection": "Website Form",         // required
+  "current_stage": 1,                           // required (1|2|3) default 1
+  "stage_value": 0,                             // required (0|1) default 0
+  "interest_scale": 5.0,                        // required (1.0-10.0) default 5.0
+  "company_id": "1453f476-...",                 // required (service-role) / auto via trigger if authenticated
+  "created_by": "uuid-user",                    // required (service-role) / auto via auth.uid()
+
+  // optional — pass null or omit
+  "email": "info@acme.com",                     // optional
+  "location": "Nairobi",                        // optional
+  "contact_person": "Jane Doe",                 // optional
+  "contact_person_email": "jane@acme.com",      // optional
+  "contact_person_phone": "+254...",            // optional
+  "contact_person_role": "CEO",                 // optional
+  "product": "Premium Package",                 // optional (must match admin_products.name if you enforce)
+  "stage_label": "Lead",                        // optional
+  "stage_notes": "Inquired via website form",   // optional
+  "status": "active",                           // optional default "active" ("active"|"won"|"lost")
+  "lost_reason": null,                          // optional (only when status="lost")
+  "custom_fields": {},                          // optional default {}
+  "parent_client_id": null,                     // optional (uuid of parent client for sub-clients)
+  "id": "auto-uuid",                            // optional default gen_random_uuid()
+  "created_at": "auto-now",                     // optional default now()
+  "updated_at": "auto-now"                      // optional default now()
+}
