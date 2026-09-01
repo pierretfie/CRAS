@@ -90,12 +90,12 @@ function AdminPage() {
 }
 
   return (
-    <div className="space-y-4 flex flex-col min-h-0">
+    <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Admin Panel</h1>
         <p className="text-sm text-muted-foreground">Manage workspace configuration</p>
       </div>
-      <Tabs defaultValue="users" className="flex flex-col flex-1 min-h-0">
+      <Tabs defaultValue="users">
         <TabsList className="grid grid-cols-7 max-w-3xl">
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="categories">Categories</TabsTrigger>
@@ -111,7 +111,7 @@ function AdminPage() {
         <TabsContent value="stages"><div className="max-w-2xl"><StagesTab /></div></TabsContent>
         <TabsContent value="company"><div className="max-w-2xl"><CompanyTab /></div></TabsContent>
         <TabsContent value="selfhosted"><div className="max-w-2xl"><SelfHostedTab /></div></TabsContent>
-        <TabsContent value="console" className="flex-1 flex flex-col min-h-0 mt-2"><ConsoleTab /></TabsContent>
+        <TabsContent value="console"><ConsoleTab /></TabsContent>
       </Tabs>
     </div>
   );
@@ -1387,7 +1387,7 @@ function ConsoleTab() {
   }
 
   return (
-    <Card className="flex flex-col flex-1 min-h-[360px] h-[calc(100vh-160px)] max-h-[calc(100vh-140px)]">
+    <Card className="flex flex-col h-[calc(100vh-180px)] min-h-[480px] mb-6 border-2">
       <CardHeader className="shrink-0">
         <div className="flex items-center justify-between gap-4">
           <div>
