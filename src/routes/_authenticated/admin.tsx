@@ -132,7 +132,8 @@ function SelfHostedTab() {
     queryKey: ["company", companyId],
     queryFn: async () => {
       if (!companyId) return null;
-      const res = await query("SELECT id, name, connection_string FROM companies WHERE id = $1", [companyId], companyId);
+      // Must read from central (no companyId routing) — tenant DB doesn't store its own connection string
+      const res = await query("SELECT id, name, connection_string FROM companies WHERE id = $1", [companyId]);
       return res.data?.[0] ?? null;
     },
     enabled: !!companyId,
