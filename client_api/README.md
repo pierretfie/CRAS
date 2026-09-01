@@ -4,7 +4,7 @@ Push clients from an external form / service directly into CRAS.
 
 **Endpoint:** `POST https://cras-middleware.fly.dev/api/clients`
 **Auth:** `x-api-key: 60539bc01b164ad780df5ef52cfbb25982991916a24fc355d729f0bba982df92`
-**Routing:** `company_id` in body drives tenant routing (central vs self-hosted) automatically.
+**Routing:** `company_id`
 
 ## Getting `created_by`
 `created_by` must be a valid `profiles.id` from that `company_id`. Get it via:
