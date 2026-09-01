@@ -602,6 +602,11 @@ export const compileLatexToPdf = createServerFn({ method: "POST" })
              .replace(/[\u{2600}-\u{27FF}]/gu, "")
              .replace(/[\u{2300}-\u{23FF}]/gu, "");
 
+        // ── Narrow spaces / NBSP / non-breaking hyphen (AI loves these) → ASCII
+        l = l.replace(/\u202F/g, " ").replace(/\u00A0/g, " ").replace(/\u2000/g, " ").replace(/\u2001/g, " ")
+             .replace(/\u2002/g, " ").replace(/\u2003/g, " ").replace(/\u2009/g, " ").replace(/\u200A/g, " ")
+             .replace(/\u2011/g, "-").replace(/\u2010/g, "-");
+
         // ── Fix \| outside math (requires $) → plain pipe
         l = l.replace(/\\\|/g, "|");
 
