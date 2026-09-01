@@ -1,5 +1,4 @@
 import { createFileRoute, Outlet, redirect, useNavigate, Link } from "@tanstack/react-router";
-import { supabase } from "@/integrations/supabase/client";
 import { getMustChangePassword } from "@/lib/api/profile.functions";
 import { getActiveFollowUps } from "@/lib/follow-ups";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
@@ -50,7 +49,9 @@ function useIdleTimeout(onTimeout: () => void) {
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
   beforeLoad: async () => {
-    const { data, error } = await supabase.auth.getUser();
+    const { initSupabase } = await import("@/integrations/supabase/client");
+    const client = await initSupabase();
+    const { data, error } = await client.auth.getUser();
     if (error || !data.user) throw redirect({ to: "/auth" });
     return { user: data.user };
   },

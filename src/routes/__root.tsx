@@ -70,6 +70,12 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   loader: async () => {
+    try {
+      const { initSupabase } = await import("@/integrations/supabase/client");
+      await initSupabase();
+    } catch {
+      // Middleware may be cold-starting; client useEffect will retry
+    }
     return null;
   },
   head: () => ({
