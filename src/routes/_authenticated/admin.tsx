@@ -1387,8 +1387,8 @@ function ConsoleTab() {
   }
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="flex flex-col h-[calc(100vh-140px)] min-h-[500px]">
+      <CardHeader className="shrink-0">
         <div className="flex items-center justify-between gap-4">
           <div>
             <CardTitle>AI Console</CardTitle>
@@ -1413,8 +1413,8 @@ function ConsoleTab() {
           )}
         </div>
       </CardHeader>
-      <CardContent>
-        <div ref={ref} className="h-[calc(100vh-320px)] min-h-[480px] overflow-y-auto space-y-3 mb-3 pr-2">
+      <CardContent className="flex flex-1 flex-col overflow-hidden gap-0 p-0">
+        <div ref={ref} className="flex-1 overflow-y-auto space-y-3 px-6 py-2">
           {messages.map((m) => {
             const { visible, latex, filename } = m.role === "assistant" ? splitMessage(m.content) : { visible: m.content, latex: null, filename: "report" };
             return (
@@ -1501,8 +1501,7 @@ function ConsoleTab() {
             );
           })}
         </div>
-        <div className="space-y-2">
-          {/* Thinking level selector */}
+        <div className="shrink-0 border-t bg-background px-6 py-3 space-y-2">
           <div className="flex items-center gap-1">
             <Brain className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
             <span className="text-xs text-muted-foreground mr-1">Thinking:</span>
