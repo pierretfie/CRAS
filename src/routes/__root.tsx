@@ -70,8 +70,15 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   loader: async () => {
-    const { initSupabase } = await import("@/integrations/supabase/client");
-    await initSupabase();
+    try {
+      const { initSupabase } = await import("@/integrations/supabase/client");
+      await initSupabase();
+    } catch (e) {
+      // Don't let transient init failures (cold-start timeouts) crash the
+      // entire app. Child routes like /auth call initSupabase() themselves,
+      // so they will retry. The error boundary is reserved for real errors.
+      console.warn("[CRAS] Root loader: Supabase init deferred (will retry on navigation):", e);
+    }
     return null;
   },
   head: () => ({

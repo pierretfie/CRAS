@@ -10,17 +10,19 @@ async function createSupabaseClientAsync(): Promise<ReturnType<typeof createClie
   let key: string | undefined = (import.meta as any).env?.VITE_SUPABASE_PUBLISHABLE_KEY;
 
   // If not baked, fetch from middleware at runtime (so .env only needs VITE_API_URL)
-  // Retry for cold-start (Fly may take ~10s to wake)
+  // Retry for cold-start (Fly/Railway may take ~15s+ to wake)
   if (!url || !key) {
     const apiUrl =
       (import.meta as any).env?.VITE_API_URL ||
       (process.env as any).VITE_API_URL ||
       (process.env as any).API_URL;
     if (apiUrl) {
-      for (let attempt = 0; attempt < 4; attempt++) {
+      const maxAttempts = 6;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
         try {
           const ctrl = new AbortController();
-          const t = setTimeout(() => ctrl.abort(), 8000);
+          const timeoutMs = attempt < 2 ? 10000 : 15000;
+          const t = setTimeout(() => ctrl.abort(), timeoutMs);
           const res = await fetch(`${apiUrl.replace(/\/$/, "")}/api/config`, { signal: ctrl.signal });
           clearTimeout(t);
           if (res.ok) {
@@ -30,8 +32,12 @@ async function createSupabaseClientAsync(): Promise<ReturnType<typeof createClie
             break;
           }
         } catch (e) {
-          if (attempt === 3) console.warn("[Supabase] Failed to fetch config from middleware:", e);
-          else await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+          if (attempt === maxAttempts - 1) {
+            console.warn("[Supabase] Failed to fetch config after retries:", e);
+          } else {
+            const delay = Math.min(1000 * Math.pow(1.5, attempt), 8000);
+            await new Promise((r) => setTimeout(r, delay));
+          }
         }
       }
     }
@@ -70,11 +76,10 @@ export async function initSupabase(): Promise<ReturnType<typeof createClient<Dat
 
 function getSupabase(): ReturnType<typeof createClient<Database>> {
   if (_supabase) return _supabase;
-  // Suspend (React Suspense) until init completes — so first open shows
-  // pending/loading instead of throwing "Supabase not initialized".
+  // Start init if not already in progress, then suspend (React Suspense)
+  // until the promise settles — shows pending/loading instead of crashing.
   if (!_initPromise) _initPromise = initSupabase().catch(() => undefined) as any;
-  if (_initPromise) throw _initPromise;
-  throw new Error("Supabase not configured");
+  throw _initPromise;
 }
 
 // Proxy that suspends until init completes, then delegates to the real client.
