@@ -33,4 +33,4 @@ curl -X POST https://cras-middleware.fly.dev/api/clients \
 
 Response: `{"id":"...","success":true}`
 
-See `payload.json` for all fields (required vs optional).
+See `payload.json` for all fields (required vs optional). `product` is optional but important — fill it when available for analytics.
