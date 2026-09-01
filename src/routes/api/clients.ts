@@ -75,8 +75,8 @@ export const Route = createFileRoute("/api/clients")({
         let createdBy = d.created_by;
         if (!createdBy) {
           try {
-            const { query } = await import("@/lib/db.server");
-            const r = await query("SELECT id FROM profiles WHERE company_id = $1 ORDER BY created_at LIMIT 1", [companyId], companyId);
+            const { queryServer } = await import("@/lib/db.server");
+            const r = await queryServer("SELECT id FROM profiles WHERE company_id = $1 ORDER BY created_at LIMIT 1", [companyId], companyId);
             createdBy = (r.data?.[0] as any)?.id ?? null;
           } catch {}
         }
@@ -88,12 +88,12 @@ export const Route = createFileRoute("/api/clients")({
         }
 
         try {
-          const { query } = await import("@/lib/db.server");
+          const { queryServer } = await import("@/lib/db.server");
 
           // Bypass set_client_defaults trigger which overwrites created_by/company_id with auth.uid()
           // by temporarily disabling it for this insert (postgres superuser can do this via query)
           // Instead we insert via direct SQL that sets the values after trigger — simplest: insert then update
-          const res = await query(
+          const res = await queryServer(
             `INSERT INTO clients (name, email, location, contact_person, contact_person_email, contact_person_phone, contact_person_role, category, mode_of_connection, product, current_stage, stage_value, stage_label, stage_notes, status, lost_reason, custom_fields, interest_scale, created_by, company_id, parent_client_id)
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21) RETURNING id`,
             [
@@ -127,7 +127,7 @@ export const Route = createFileRoute("/api/clients")({
 
           // Fix trigger-overwritten company_id/created_by if needed (trigger forces my_company_id()/auth.uid())
           if (id) {
-            await query("UPDATE clients SET company_id = $1, created_by = $2 WHERE id = $3", [companyId, createdBy, id], companyId);
+            await queryServer("UPDATE clients SET company_id = $1, created_by = $2 WHERE id = $3", [companyId, createdBy, id], companyId);
           }
 
           return new Response(JSON.stringify({ id, success: true }), {
