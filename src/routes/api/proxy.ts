@@ -18,7 +18,6 @@ const handlers: Record<string, () => Promise<any>> = {
   "normalizeClientData": () => import("@/lib/api/ai.functions").then((m) => m.normalizeClientData),
   "batchNormalizeClients": () => import("@/lib/api/ai.functions").then((m) => m.batchNormalizeClients),
   "classifyStageValueAI": () => import("@/lib/api/ai.functions").then((m) => m.classifyStageValueAI),
-  "compileLatexToPdf": () => import("@/lib/api/ai.functions").then((m) => m.compileLatexToPdf),
   // Auth
   "publicSignUp": () => import("@/lib/api/auth.functions").then((m) => m.publicSignUp),
 };

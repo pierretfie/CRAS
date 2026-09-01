@@ -449,15 +449,8 @@ export function AIAssistantDrawer() {
       );
       
       try {
-        const apiUrlForPdf = (import.meta as any).env?.VITE_API_URL as string | undefined;
-        let compiled: any;
-        if (apiUrlForPdf && typeof window !== "undefined") {
-          const { callViaProxy } = await import("@/lib/remote");
-          compiled = await callViaProxy("compileLatexToPdf", { latex: finalLatex });
-        } else {
-          const { compileLatexToPdf } = await import("@/lib/api/ai.functions");
-          compiled = await compileLatexToPdf({ data: { latex: finalLatex } });
-        }
+        const { compileLatexToPdf } = await import("@/lib/api/ai.functions");
+        const compiled = await compileLatexToPdf({ data: { latex: finalLatex } });
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantId
