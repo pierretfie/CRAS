@@ -70,12 +70,8 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   loader: async () => {
-    try {
-      const { initSupabase } = await import("@/integrations/supabase/client");
-      await initSupabase();
-    } catch {
-      // Middleware may be cold-starting; client useEffect will retry
-    }
+    const { initSupabase } = await import("@/integrations/supabase/client");
+    await initSupabase();
     return null;
   },
   head: () => ({
@@ -90,6 +86,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "icon", type: "image/png", href: crasLogo },
     ],
   }),
+  pendingComponent: () => (
+    <div className="min-h-screen flex items-center justify-center text-muted-foreground text-sm">
+      Loading workspace…
+    </div>
+  ),
   shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,

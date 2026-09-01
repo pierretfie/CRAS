@@ -10,21 +10,29 @@ async function createSupabaseClientAsync(): Promise<ReturnType<typeof createClie
   let key: string | undefined = (import.meta as any).env?.VITE_SUPABASE_PUBLISHABLE_KEY;
 
   // If not baked, fetch from middleware at runtime (so .env only needs VITE_API_URL)
+  // Retry for cold-start (Fly may take ~10s to wake)
   if (!url || !key) {
     const apiUrl =
       (import.meta as any).env?.VITE_API_URL ||
       (process.env as any).VITE_API_URL ||
       (process.env as any).API_URL;
     if (apiUrl) {
-      try {
-        const res = await fetch(`${apiUrl.replace(/\/$/, "")}/api/config`);
-        if (res.ok) {
-          const json = await res.json();
-          url = url || json.url;
-          key = key || json.anonKey;
+      for (let attempt = 0; attempt < 4; attempt++) {
+        try {
+          const ctrl = new AbortController();
+          const t = setTimeout(() => ctrl.abort(), 8000);
+          const res = await fetch(`${apiUrl.replace(/\/$/, "")}/api/config`, { signal: ctrl.signal });
+          clearTimeout(t);
+          if (res.ok) {
+            const json = await res.json();
+            url = url || json.url;
+            key = key || json.anonKey;
+            break;
+          }
+        } catch (e) {
+          if (attempt === 3) console.warn("[Supabase] Failed to fetch config from middleware:", e);
+          else await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
         }
-      } catch (e) {
-        console.warn("[Supabase] Failed to fetch config from middleware:", e);
       }
     }
   }
@@ -48,24 +56,37 @@ async function createSupabaseClientAsync(): Promise<ReturnType<typeof createClie
 export async function initSupabase(): Promise<ReturnType<typeof createClient<Database>>> {
   if (_supabase) return _supabase;
   if (_initPromise) return _initPromise;
-  _initPromise = createSupabaseClientAsync().then((c) => {
-    _supabase = c;
-    return c;
-  });
+  _initPromise = createSupabaseClientAsync()
+    .then((c) => {
+      _supabase = c;
+      return c;
+    })
+    .catch((e) => {
+      _initPromise = undefined;
+      throw e;
+    });
   return _initPromise;
 }
 
 function getSupabase(): ReturnType<typeof createClient<Database>> {
-  if (!_supabase) {
-    throw new Error("Supabase not initialized. Call initSupabase() in root loader first.");
-  }
-  return _supabase;
+  if (_supabase) return _supabase;
+  // Suspend (React Suspense) until init completes — so first open shows
+  // pending/loading instead of throwing "Supabase not initialized".
+  if (!_initPromise) _initPromise = initSupabase().catch(() => undefined) as any;
+  if (_initPromise) throw _initPromise;
+  throw new Error("Supabase not configured");
 }
 
-// Proxy that ensures init before any property access (for backwards compat)
-export const supabase = new Proxy({} as ReturnType<typeof createClient<Database>>, {
-  get(_target, prop: string | symbol, _receiver) {
-    const client = getSupabase();
-    return Reflect.get(client as any, prop);
+// Proxy that suspends until init completes, then delegates to the real client.
+export const supabase: ReturnType<typeof createClient<Database>> = new Proxy(
+  {} as ReturnType<typeof createClient<Database>>,
+  {
+    get(_target, prop: string | symbol, _receiver) {
+      const client = getSupabase();
+      const val = Reflect.get(client as any, prop);
+      // Bind methods so `this` stays correct when accessed via proxy.
+      if (typeof val === "function") return val.bind(client);
+      return val;
+    },
   },
-});
+) as any;
