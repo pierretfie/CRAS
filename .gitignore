@@ -39,3 +39,4 @@ release/
 *.sln
 *.sw?
 .worktrees
+client_api/
