@@ -111,7 +111,7 @@ function AdminPage() {
         <TabsContent value="stages"><div className="max-w-2xl"><StagesTab /></div></TabsContent>
         <TabsContent value="company"><div className="max-w-2xl"><CompanyTab /></div></TabsContent>
         <TabsContent value="selfhosted"><div className="max-w-2xl"><SelfHostedTab /></div></TabsContent>
-        <TabsContent value="console" className="flex-1 flex flex-col min-h-0 mt-2"><ConsoleTab /></TabsContent>
+        <TabsContent value="console" className="flex-1 flex flex-col min-h-0 mt-6"><ConsoleTab /></TabsContent>
       </Tabs>
     </div>
   );
