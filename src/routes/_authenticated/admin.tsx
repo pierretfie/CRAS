@@ -1501,7 +1501,7 @@ function ConsoleTab() {
             );
           })}
         </div>
-        <div className="shrink-0 border-t-2 border-red-500 bg-background px-6 py-3 space-y-2">
+        <div className="shrink-0 border-t bg-background px-6 py-3 space-y-2">
           <div className="flex items-center gap-1">
             <Brain className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
             <span className="text-xs text-muted-foreground mr-1">Thinking:</span>
@@ -1525,7 +1525,7 @@ function ConsoleTab() {
             </span>
           </div>
           <div className="flex gap-2">
-            <Textarea rows={2} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }} placeholder="Ask..." className="resize-none" />
+            <Textarea rows={2} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(); } }} placeholder="Ask..." className="resize-none border-red-500 focus-visible:border-red-500 focus-visible:ring-red-500/50" />
             <Button
               onClick={streaming ? stopGeneration : send}
               disabled={!streaming && (!input.trim())}
