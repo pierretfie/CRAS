@@ -1501,7 +1501,7 @@ function ConsoleTab() {
             );
           })}
         </div>
-        <div className="shrink-0 border-t bg-background px-6 py-3 space-y-2">
+        <div className="shrink-0 border-t-2 border-red-500 bg-background px-6 py-3 space-y-2">
           <div className="flex items-center gap-1">
             <Brain className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
             <span className="text-xs text-muted-foreground mr-1">Thinking:</span>
