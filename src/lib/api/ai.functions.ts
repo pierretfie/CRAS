@@ -602,6 +602,9 @@ export const compileLatexToPdf = createServerFn({ method: "POST" })
              .replace(/[\u{2600}-\u{27FF}]/gu, "")
              .replace(/[\u{2300}-\u{23FF}]/gu, "");
 
+        // ── Fix \| outside math (requires $) → plain pipe
+        l = l.replace(/\\\|/g, "|");
+
         // ── Escape bare % in text ─────────────────────────────────────────
         l = l.replace(/(?<!\\)%/g, "\\%");
 
@@ -623,6 +626,8 @@ export const compileLatexToPdf = createServerFn({ method: "POST" })
           return `\\usepackage[${opts}]{geometry}`;
         },
       );
+      // Fix stray semicolon after \newpage (AI sometimes writes \newpage;)
+      fixed = fixed.replace(/\\newpage;/g, "\\newpage");
       return fixed;
     }
 
