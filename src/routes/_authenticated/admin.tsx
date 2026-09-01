@@ -209,18 +209,6 @@ function SelfHostedTab() {
     }
   }
 
-  async function remove() {
-    if (!companyId) return;
-    if (!confirm("Remove connection string? Company will fall back to central database.")) return;
-    try {
-      await query("UPDATE companies SET connection_string = NULL WHERE id = $1", [companyId]);
-      toast.success("Connection string removed");
-      qc.invalidateQueries({ queryKey: ["company", companyId] });
-    } catch (err: any) {
-      toast.error(err.message ?? "Failed to remove");
-    }
-  }
-
   return (
     <Card>
       <CardHeader>
@@ -295,13 +283,7 @@ function SelfHostedTab() {
           </div>
         )}
 
-        {hasConnStr && (
-          <div className="border-t pt-4">
-            <Button variant="destructive" size="sm" onClick={remove}>
-              Remove Connection String
-            </Button>
-          </div>
-        )}
+
       </CardContent>
     </Card>
   );
