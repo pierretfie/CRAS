@@ -14,6 +14,9 @@ RUN npm run build
 
 # Production image
 FROM node:22-slim
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    texlive-latex-base texlive-latex-recommended texlive-fonts-recommended texlive-latex-extra \
+ && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=base /app/.output /app/.output
 COPY --from=base /app/node_modules /app/node_modules
