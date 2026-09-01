@@ -10,13 +10,7 @@ function createSupabaseAdminClient() {
   const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!SUPABASE_URL || !SUPABASE_SECRET_KEY) {
-    const missing = [
-      ...(!SUPABASE_URL ? ['SUPABASE_URL'] : []),
-      ...(!SUPABASE_SECRET_KEY ? ['SUPABASE_SECRET_KEY'] : []),
-    ];
-    const message = `Missing Supabase environment variable(s): ${missing.join(', ')}. Ensure SUPABASE_URL and SUPABASE_SECRET_KEY are set on your server (Fly secrets) or in your .env for local dev.`;
-    console.error(`[Supabase] ${message}`);
-    throw new Error(message);
+    throw new Error("Supabase not configured");
   }
 
   return createClient<Database>(SUPABASE_URL, SUPABASE_SECRET_KEY, {

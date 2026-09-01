@@ -13,13 +13,7 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
     const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;
 
     if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-      const missing = [
-        ...(!SUPABASE_URL ? ['SUPABASE_URL'] : []),
-        ...(!SUPABASE_PUBLISHABLE_KEY ? ['SUPABASE_PUBLISHABLE_KEY'] : []),
-      ];
-      const message = `Missing Supabase environment variable(s): ${missing.join(', ')}. Ensure SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY are set on your server (Fly secrets) or in your .env for local dev.`;
-      console.error(`[Supabase] ${message}`);
-      throw new Error(message);
+      throw new Error("Supabase not configured");
     }
     
     const request = getRequest();

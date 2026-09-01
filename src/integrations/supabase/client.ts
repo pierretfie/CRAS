@@ -33,10 +33,7 @@ async function createSupabaseClientAsync(): Promise<ReturnType<typeof createClie
   key = key || (process.env as any).SUPABASE_PUBLISHABLE_KEY || (process.env as any).VITE_SUPABASE_PUBLISHABLE_KEY;
 
   if (!url || !key) {
-    const missing = [...(!url ? ["SUPABASE_URL"] : []), ...(!key ? ["SUPABASE_PUBLISHABLE_KEY"] : [])];
-    const message = `Missing Supabase environment variable(s): ${missing.join(", ")}. Set VITE_API_URL in your .env and ensure middleware has SUPABASE_URL/PUBLISHABLE_KEY.`;
-    console.error(`[Supabase] ${message}`);
-    throw new Error(message);
+    throw new Error("Supabase not configured");
   }
 
   return createClient<Database>(url, key, {
