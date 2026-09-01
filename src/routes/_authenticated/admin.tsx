@@ -253,7 +253,7 @@ function SelfHostedTab() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="rounded-md bg-muted p-3 text-sm">
-          <p className="font-medium">Status: {hasConnStr ? "You are self-hosted" : "Using central database (hosted by CRAS)"}</p>
+          <p className={`font-medium ${hasConnStr ? "text-green-600 dark:text-green-400" : ""}`}>Status: {hasConnStr ? "You are self-hosted" : "Using central database (hosted by CRAS)"}</p>
           {hasConnStr && <p className="text-muted-foreground mt-1">Data is stored in your own PostgreSQL database.</p>}
         </div>
 
