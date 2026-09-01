@@ -111,7 +111,7 @@ function AdminPage() {
         <TabsContent value="stages"><div className="max-w-2xl"><StagesTab /></div></TabsContent>
         <TabsContent value="company"><div className="max-w-2xl"><CompanyTab /></div></TabsContent>
         <TabsContent value="selfhosted"><div className="max-w-2xl"><SelfHostedTab /></div></TabsContent>
-        <TabsContent value="console" className="flex-1 flex flex-col min-h-0 mt-6"><ConsoleTab /></TabsContent>
+        <TabsContent value="console" className="flex-1 flex flex-col min-h-0 mt-2"><ConsoleTab /></TabsContent>
       </Tabs>
     </div>
   );
@@ -1387,7 +1387,7 @@ function ConsoleTab() {
   }
 
   return (
-    <Card className="flex flex-col flex-1 min-h-[360px] max-h-[calc(100vh-280px)]">
+    <Card className="flex flex-col flex-1 min-h-[360px] h-[calc(100vh-160px)] max-h-[calc(100vh-140px)]">
       <CardHeader className="shrink-0">
         <div className="flex items-center justify-between gap-4">
           <div>
