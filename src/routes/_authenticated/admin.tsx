@@ -123,7 +123,6 @@ function SelfHostedTab() {
   const companyId = me?.company?.id;
   const [connStr, setConnStr] = useState("");
   const [showConnStr, setShowConnStr] = useState(false);
-  const [revealed, setRevealed] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null);
@@ -166,26 +165,6 @@ function SelfHostedTab() {
       toast.error(err.message ?? "Failed to save");
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function reveal() {
-    if (!companyId) return;
-    try {
-      const data = { companyId };
-      const apiUrl = (import.meta as any).env?.VITE_API_URL as string | undefined;
-      let res: any;
-      if (apiUrl && typeof window !== "undefined") {
-        const { callViaProxy } = await import("@/lib/remote");
-        res = await callViaProxy("revealConnectionString", data);
-      } else {
-        const { revealConnectionStringFn } = await import("@/lib/db.fn");
-        res = await revealConnectionStringFn({ data });
-      }
-      if (res.error) throw new Error(res.error.message);
-      setRevealed(res.data ?? "No connection string set");
-    } catch (err: any) {
-      toast.error(err.message ?? "Failed to reveal");
     }
   }
 
@@ -234,9 +213,8 @@ function SelfHostedTab() {
     if (!companyId) return;
     if (!confirm("Remove connection string? Company will fall back to central database.")) return;
     try {
-      await query("UPDATE companies SET connection_string = NULL WHERE id = $1", [companyId], companyId);
+      await query("UPDATE companies SET connection_string = NULL WHERE id = $1", [companyId]);
       toast.success("Connection string removed");
-      setRevealed(null);
       qc.invalidateQueries({ queryKey: ["company", companyId] });
     } catch (err: any) {
       toast.error(err.message ?? "Failed to remove");
@@ -318,18 +296,10 @@ function SelfHostedTab() {
         )}
 
         {hasConnStr && (
-          <div className="space-y-2 border-t pt-4">
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={reveal}>
-                {revealed ? "Hide" : "Reveal Connection String"}
-              </Button>
-              <Button variant="destructive" size="sm" onClick={remove}>
-                Remove
-              </Button>
-            </div>
-            {revealed && (
-              <pre className="rounded-md bg-muted p-3 text-xs font-mono break-all whitespace-pre-wrap">{revealed}</pre>
-            )}
+          <div className="border-t pt-4">
+            <Button variant="destructive" size="sm" onClick={remove}>
+              Remove Connection String
+            </Button>
           </div>
         )}
       </CardContent>
