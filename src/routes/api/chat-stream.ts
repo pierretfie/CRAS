@@ -17,6 +17,15 @@ import type { ThinkingLevel } from "@/lib/ai-nvidia.server";
 export const Route = createFileRoute("/api/chat-stream")({
   server: {
     handlers: {
+      OPTIONS: async () =>
+        new Response(null, {
+          status: 204,
+          headers: {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
+          },
+        }),
       POST: async ({ request }) => {
         let body: {
           messages: { role: "user" | "assistant"; content: string }[];
@@ -28,7 +37,7 @@ export const Route = createFileRoute("/api/chat-stream")({
         } catch {
           return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
             status: 400,
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
           });
         }
 
@@ -46,7 +55,7 @@ export const Route = createFileRoute("/api/chat-stream")({
         if (!isAIAvailable()) {
           return new Response(
             JSON.stringify({ error: "NVIDIA_API_KEY is not configured." }),
-            { status: 503, headers: { "Content-Type": "application/json" } },
+            { status: 503, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
           );
         }
 
@@ -169,6 +178,7 @@ export const Route = createFileRoute("/api/chat-stream")({
             "Content-Type": "text/event-stream",
             "Cache-Control": "no-cache",
             Connection: "keep-alive",
+            "Access-Control-Allow-Origin": "*",
           },
         });
       },
