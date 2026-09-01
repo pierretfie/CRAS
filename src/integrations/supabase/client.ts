@@ -16,28 +16,36 @@ async function createSupabaseClientAsync(): Promise<ReturnType<typeof createClie
       (import.meta as any).env?.VITE_API_URL ||
       (process.env as any).VITE_API_URL ||
       (process.env as any).API_URL;
-    if (apiUrl) {
-      const maxAttempts = 6;
-      for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        try {
-          const ctrl = new AbortController();
-          const timeoutMs = attempt < 2 ? 10000 : 15000;
-          const t = setTimeout(() => ctrl.abort(), timeoutMs);
-          const res = await fetch(`${apiUrl.replace(/\/$/, "")}/api/config`, { signal: ctrl.signal });
-          clearTimeout(t);
-          if (res.ok) {
-            const json = await res.json();
-            url = url || json.url;
-            key = key || json.anonKey;
-            break;
-          }
-        } catch (e) {
-          if (attempt === maxAttempts - 1) {
-            console.warn("[Supabase] Failed to fetch config after retries:", e);
-          } else {
-            const delay = Math.min(1000 * Math.pow(1.5, attempt), 8000);
-            await new Promise((r) => setTimeout(r, delay));
-          }
+    // When deployed on Fly, VITE_API_URL may not be baked — fallback to same-origin
+    // so the fetch still works without extra env wiring.
+    const configUrl = apiUrl ? `${apiUrl.replace(/\/$/, "")}/api/config` : "/api/config";
+    const maxAttempts = 6;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const ctrl = new AbortController();
+        const timeoutMs = attempt < 2 ? 10000 : 15000;
+        const t = setTimeout(() => ctrl.abort(), timeoutMs);
+        const res = await fetch(configUrl, { signal: ctrl.signal });
+        clearTimeout(t);
+        if (res.ok) {
+          const json = await res.json();
+          url = url || json.url;
+          key = key || json.anonKey;
+          break;
+        }
+        // Non-OK response — retry with backoff (server may be waking)
+        if (attempt < maxAttempts - 1) {
+          const delay = Math.min(1000 * Math.pow(1.5, attempt), 8000);
+          await new Promise((r) => setTimeout(r, delay));
+        } else {
+          console.warn("[Supabase] /api/config returned non-OK:", res.status);
+        }
+      } catch (e) {
+        if (attempt === maxAttempts - 1) {
+          console.warn("[Supabase] Failed to fetch config after retries:", e);
+        } else {
+          const delay = Math.min(1000 * Math.pow(1.5, attempt), 8000);
+          await new Promise((r) => setTimeout(r, delay));
         }
       }
     }

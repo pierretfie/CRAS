@@ -284,7 +284,7 @@ async function createWindow(): Promise<void> {
     title: "CRAS - Conversion Rate Analytics System",
     icon: fs.existsSync(iconPath) ? iconPath : undefined,
     webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
+      preload: path.join(__dirname, "preload.cjs"),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
