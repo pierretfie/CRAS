@@ -1,4 +1,5 @@
 import { createFileRoute, Outlet, redirect, useNavigate, Link } from "@tanstack/react-router";
+import { supabase } from "@/integrations/supabase/client";
 import { getMustChangePassword } from "@/lib/api/profile.functions";
 import { getActiveFollowUps } from "@/lib/follow-ups";
 import { SidebarProvider, SidebarTrigger, SidebarInset } from "@/components/ui/sidebar";
