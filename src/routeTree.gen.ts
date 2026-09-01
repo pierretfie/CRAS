@@ -18,6 +18,7 @@ import { Route as ApiSaveConnectionStringRouteImport } from './routes/api/save-c
 import { Route as ApiProxyRouteImport } from './routes/api/proxy'
 import { Route as ApiDbRouteImport } from './routes/api/db'
 import { Route as ApiConfigRouteImport } from './routes/api/config'
+import { Route as ApiClientsRouteImport } from './routes/api/clients'
 import { Route as ApiChatStreamRouteImport } from './routes/api/chat-stream'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedMetricsRouteImport } from './routes/_authenticated/metrics'
@@ -72,6 +73,11 @@ const ApiDbRoute = ApiDbRouteImport.update({
 const ApiConfigRoute = ApiConfigRouteImport.update({
   id: '/api/config',
   path: '/api/config',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiClientsRoute = ApiClientsRouteImport.update({
+  id: '/api/clients',
+  path: '/api/clients',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiChatStreamRoute = ApiChatStreamRouteImport.update({
@@ -144,6 +150,7 @@ export interface FileRoutesByFullPath {
   '/metrics': typeof AuthenticatedMetricsRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/api/chat-stream': typeof ApiChatStreamRoute
+  '/api/clients': typeof ApiClientsRoute
   '/api/config': typeof ApiConfigRoute
   '/api/db': typeof ApiDbRoute
   '/api/proxy': typeof ApiProxyRoute
@@ -165,6 +172,7 @@ export interface FileRoutesByTo {
   '/metrics': typeof AuthenticatedMetricsRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/api/chat-stream': typeof ApiChatStreamRoute
+  '/api/clients': typeof ApiClientsRoute
   '/api/config': typeof ApiConfigRoute
   '/api/db': typeof ApiDbRoute
   '/api/proxy': typeof ApiProxyRoute
@@ -188,6 +196,7 @@ export interface FileRoutesById {
   '/_authenticated/metrics': typeof AuthenticatedMetricsRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/api/chat-stream': typeof ApiChatStreamRoute
+  '/api/clients': typeof ApiClientsRoute
   '/api/config': typeof ApiConfigRoute
   '/api/db': typeof ApiDbRoute
   '/api/proxy': typeof ApiProxyRoute
@@ -211,6 +220,7 @@ export interface FileRouteTypes {
     | '/metrics'
     | '/profile'
     | '/api/chat-stream'
+    | '/api/clients'
     | '/api/config'
     | '/api/db'
     | '/api/proxy'
@@ -232,6 +242,7 @@ export interface FileRouteTypes {
     | '/metrics'
     | '/profile'
     | '/api/chat-stream'
+    | '/api/clients'
     | '/api/config'
     | '/api/db'
     | '/api/proxy'
@@ -254,6 +265,7 @@ export interface FileRouteTypes {
     | '/_authenticated/metrics'
     | '/_authenticated/profile'
     | '/api/chat-stream'
+    | '/api/clients'
     | '/api/config'
     | '/api/db'
     | '/api/proxy'
@@ -271,6 +283,7 @@ export interface RootRouteChildren {
   ChangePasswordRoute: typeof ChangePasswordRoute
   RunMigrationsRoute: typeof RunMigrationsRoute
   ApiChatStreamRoute: typeof ApiChatStreamRoute
+  ApiClientsRoute: typeof ApiClientsRoute
   ApiConfigRoute: typeof ApiConfigRoute
   ApiDbRoute: typeof ApiDbRoute
   ApiProxyRoute: typeof ApiProxyRoute
@@ -340,6 +353,13 @@ declare module '@tanstack/react-router' {
       path: '/api/config'
       fullPath: '/api/config'
       preLoaderRoute: typeof ApiConfigRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/clients': {
+      id: '/api/clients'
+      path: '/api/clients'
+      fullPath: '/api/clients'
+      preLoaderRoute: typeof ApiClientsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/chat-stream': {
@@ -458,6 +478,7 @@ const rootRouteChildren: RootRouteChildren = {
   ChangePasswordRoute: ChangePasswordRoute,
   RunMigrationsRoute: RunMigrationsRoute,
   ApiChatStreamRoute: ApiChatStreamRoute,
+  ApiClientsRoute: ApiClientsRoute,
   ApiConfigRoute: ApiConfigRoute,
   ApiDbRoute: ApiDbRoute,
   ApiProxyRoute: ApiProxyRoute,
