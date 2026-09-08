@@ -514,14 +514,22 @@ export async function compileLatexLocally(latex: string): Promise<{ pdf: string 
       if (inVerbatim) { result.push(line); continue; }
       if (/^\s*%/.test(line)) { result.push(line); continue; }
       let l = line;
-      l = l.replace(/≥/g, "$\\geq$").replace(/≤/g, "$\\leq$");
-      l = l.replace(/—/g, "---").replace(/–/g, "--");
-      l = l.replace(/[\u{1F000}-\u{1FFFF}]/gu, "");
-      l = l.replace(/\u202F/g, " ").replace(/\u00A0/g, " ");
+      l = l.replace(/≥/g, "$\\geq$").replace(/≤/g, "$\\leq$").replace(/≠/g, "$\\neq$").replace(/≈/g, "$\\approx$").replace(/→/g, "$\\rightarrow$").replace(/←/g, "$\\leftarrow$").replace(/↑/g, "$\\uparrow$").replace(/↓/g, "$\\downarrow$").replace(/×/g, "$\\times$").replace(/÷/g, "$\\div$").replace(/±/g, "$\\pm$").replace(/∞/g, "$\\infty$").replace(/∑/g, "$\\sum$").replace(/√/g, "$\\sqrt{}$").replace(/∂/g, "$\\partial$").replace(/∆/g, "$\\Delta$").replace(/Δ/g, "$\\Delta$").replace(/π/g, "$\\pi$").replace(/α/g, "$\\alpha$").replace(/β/g, "$\\beta$").replace(/γ/g, "$\\gamma$").replace(/δ/g, "$\\delta$").replace(/ε/g, "$\\varepsilon$").replace(/θ/g, "$\\theta$").replace(/λ/g, "$\\lambda$").replace(/μ/g, "$\\mu$").replace(/σ/g, "$\\sigma$").replace(/τ/g, "$\\tau$").replace(/φ/g, "$\\phi$").replace(/ω/g, "$\\omega$");
+      l = l.replace(/—/g, "---").replace(/–/g, "--").replace(/…/g, "\\ldots{}").replace(/•/g, "\\textbullet{}").replace(/·/g, "\\textperiodcentered{}").replace(/"/g, "``").replace(/'/g, "`");
+      l = l.replace(/°/g, "$^{\\circ}$").replace(/©/g, "\\textcopyright{}").replace(/®/g, "\\textregistered{}").replace(/™/g, "\\texttrademark{}").replace(/½/g, "$\\frac{1}{2}$").replace(/¼/g, "$\\frac{1}{4}$").replace(/¾/g, "$\\frac{3}{4}$");
+      l = l.replace(/[\u{1F000}-\u{1FFFF}]/gu, "").replace(/[\u{2600}-\u{27FF}]/gu, "").replace(/[\u{2300}-\u{23FF}]/gu, "");
+      l = l.replace(/\u202F/g, " ").replace(/\u00A0/g, " ").replace(/\u2000/g, " ").replace(/\u2001/g, " ").replace(/\u2002/g, " ").replace(/\u2003/g, " ").replace(/\u2009/g, " ").replace(/\u200A/g, " ").replace(/\u2011/g, "-").replace(/\u2010/g, "-");
+      l = l.replace(/\\\|/g, "|");
+      l = l.replace(/(?<!\\)%/g, "\\%");
       result.push(l);
     }
     let fixed = result.join("\n");
     fixed = fixed.replace(/\\usepackage\[(\d+(?:\.\d+)?(?:in|cm|mm|pt))\]\{geometry\}/g, "\\usepackage[margin=$1]{geometry}");
+    fixed = fixed.replace(/\\usepackage\[(\d+(?:\.\d+)?(?:in|cm|mm|pt))(?:,\s*)?(\d+(?:\.\d+)?(?:in|cm|mm|pt))?\]\{geometry\}/g, (match: string, m1: string, m2: string) => {
+      const opts = m2 ? `margin=${m1}, margin=${m2}` : `margin=${m1}`;
+      return `\\usepackage[${opts}]{geometry}`;
+    });
+    fixed = fixed.replace(/\\newpage;/g, "\\newpage");
     return fixed;
   }
 
