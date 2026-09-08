@@ -651,6 +651,18 @@ export const compileLatexToPdf = createServerFn({ method: "POST" })
       tex: string,
       tmpDir: string,
     ): Promise<{ success: boolean; pdf?: string; log?: string; fullLog?: string }> {
+      // Error-proof: reject empty or truncated LaTeX before invoking pdflatex
+      const trimmed = tex.trim();
+      if (trimmed.length < 50) {
+        return { success: false, log: "Generated LaTeX is empty or too short — AI returned no document. Please try again with a more specific prompt." };
+      }
+      if (!trimmed.includes("\\begin{document}") || !trimmed.includes("\\end{document}")) {
+        console.error("[LaTeX] tryCompile rejected malformed LaTeX (missing begin/end), length:", trimmed.length, "first 300:", trimmed.slice(0, 300));
+        return { success: false, log: "Generated LaTeX is malformed (missing \\begin{document}). The AI output was truncated — please retry. If it persists, simplify the request." };
+      }
+      if (trimmed === "." || trimmed === "\\begin{document}.") {
+        return { success: false, log: "Generated LaTeX is empty (received '.'). Please try again." };
+      }
       const needsToc = tex.includes("\\tableofcontents") || tex.includes("\\ref{");
 
       // Find pdflatex — check PATH first, then common Windows locations
@@ -726,8 +738,15 @@ export const compileLatexToPdf = createServerFn({ method: "POST" })
     mkdirSync(tmpDir, { recursive: true });
 
     try {
+      // Guard: empty or truncated input from AI/client — don't invoke pdflatex
+      if (!data.latex || data.latex.trim().length < 20) {
+        throw new Error("No LaTeX content received from AI. Please try again — if the issue persists, simplify the report request.");
+      }
       // Pass 1: sanitize then compile
       const sanitized = sanitizeLatex(data.latex);
+      if (!sanitized.trim().includes("\\begin{document}")) {
+        console.error("[LaTeX] sanitized output missing begin{document}, original length:", data.latex.length, "sanitized length:", sanitized.length);
+      }
       const result = await tryCompile(sanitized, tmpDir);
       if (result.success) return { pdf: result.pdf! };
 

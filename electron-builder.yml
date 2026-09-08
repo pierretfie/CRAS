@@ -8,6 +8,7 @@ directories:
 
 files:
   - "dist-electron/*.js"
+  - "dist-electron/*.cjs"
   - "dist-electron/*.html"
   - "package.json"
 

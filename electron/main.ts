@@ -276,6 +276,10 @@ async function createWindow(): Promise<void> {
     ? path.join(__dirname, "..", "src", "assets", "cras_logo.png")
     : path.join(process.resourcesPath, "icon.png");
 
+  const preloadCjs = path.join(__dirname, "preload.cjs");
+  const preloadJs = path.join(__dirname, "preload.js");
+  const preloadPath = fs.existsSync(preloadCjs) ? preloadCjs : preloadJs;
+
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -284,7 +288,7 @@ async function createWindow(): Promise<void> {
     title: "CRAS - Conversion Rate Analytics System",
     icon: fs.existsSync(iconPath) ? iconPath : undefined,
     webPreferences: {
-      preload: path.join(__dirname, "preload.cjs"),
+      preload: preloadPath,
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: false,
