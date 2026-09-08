@@ -951,13 +951,23 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
       }
     }
 
-    // Fire admin notifications (fire-and-forget — don't block the UI)
+    // Fire admin notifications (fire-and-forget — don't block the UI) — use query for self-hosted routing
     try {
-      const { data: profileData } = await supabase.from("profiles").select("name").eq("id", u.user.id).single();
-      const byName: string = (profileData as any)?.name ?? "Someone";
-      const { data: clientData } = await supabase.from("clients").select("name, product").eq("id", client.id).single();
-      const clientName: string = (clientData as any)?.name ?? "Unknown client";
-      const product: string | null = (clientData as any)?.product ?? null;
+      const companyId = me?.company?.id as string | undefined;
+      let byName = "Someone";
+      let clientName: string = (client as any)?.name ?? "Unknown client";
+      let product: string | null = (client as any)?.product ?? null;
+      if (companyId) {
+        const profRes = await query(`SELECT name FROM profiles WHERE id = $1`, [u.user.id], companyId);
+        byName = (profRes.data as any[])?.[0]?.name ?? byName;
+        // client name/product already known from query-fetched client, no extra fetch needed
+      } else {
+        const { data: profileData } = await supabase.from("profiles").select("name").eq("id", u.user.id).single();
+        byName = (profileData as any)?.name ?? byName;
+        const { data: clientData } = await supabase.from("clients").select("name, product").eq("id", client.id).single();
+        clientName = (clientData as any)?.name ?? clientName;
+        product = (clientData as any)?.product ?? product;
+      }
       if (eventType === "won") {
         notifyClientWon(client.id, clientName, byName, product);
       } else if (eventType === "lost") {

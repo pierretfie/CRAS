@@ -2,6 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { query } from "@/lib/db";
 import { logFollowUp, completeFollowUp, cancelFollowUp, FollowUp, isLoggedThisCycle, followUpStatusText } from "@/lib/follow-ups";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -46,6 +48,8 @@ interface FollowUpWithClient extends FollowUp {
 
 function FollowUpsPage() {
   const { u } = useAuth();
+  const { data: me } = useCurrentUser();
+  const companyId = me?.company?.id as string | undefined;
   const userId = u?.user?.id;
   const [followUps, setFollowUps] = useState<FollowUpWithClient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,6 +62,26 @@ function FollowUpsPage() {
     }
     setLoading(true);
     try {
+      if (companyId) {
+        const res = await query(
+          `SELECT f.*, c.name, c.category, c.mode_of_connection, c.product, c.current_stage, c.interest_scale, c.status as client_status,
+                  (SELECT json_agg(json_build_object('logged_at', l.logged_at) ORDER BY l.logged_at DESC) FROM follow_up_logs l WHERE l.follow_up_id = f.id) as follow_up_logs
+           FROM client_follow_ups f
+           LEFT JOIN clients c ON c.id = f.client_id AND c.company_id = $2
+           WHERE f.user_id = $1 AND f.status = 'active'
+           ORDER BY f.next_reminder ASC`,
+          [userId, companyId],
+          companyId,
+        );
+        if (res.error) throw res.error;
+        const withLastLog = ((res.data as any[]) ?? []).map(f => {
+          const logs: { logged_at: string }[] = f.follow_up_logs ?? [];
+          const lastLog = logs.sort((a, b) => new Date(b.logged_at).getTime() - new Date(a.logged_at).getTime())[0] ?? null;
+          return { ...f, clients: f.name ? { name: f.name, category: f.category, mode_of_connection: f.mode_of_connection, product: f.product, current_stage: f.current_stage, interest_scale: f.interest_scale, status: f.client_status } : null, last_logged_at: lastLog?.logged_at ?? null, follow_up_logs: undefined };
+        });
+        setFollowUps(withLastLog as FollowUpWithClient[]);
+        return;
+      }
       const { data, error } = await supabase
         .from("client_follow_ups")
         .select(`
@@ -110,7 +134,7 @@ function FollowUpsPage() {
   const handleFollowedUp = async (f: FollowUpWithClient, activityType: string) => {
     await withBusy(f.id, async () => {
       const now = new Date().toISOString();
-      const updated = await logFollowUp(f, activityType);
+      const updated = await logFollowUp(f, activityType, null, companyId);
       setFollowUps(prev =>
         prev.map(x => x.id === f.id
           ? { ...x, next_reminder: updated.next_reminder, last_logged_at: now }
@@ -123,7 +147,7 @@ function FollowUpsPage() {
 
   const handleDone = async (f: FollowUpWithClient) => {
     await withBusy(f.id, async () => {
-      await completeFollowUp(f.id);
+      await completeFollowUp(f.id, companyId);
       setFollowUps(prev => prev.filter(x => x.id !== f.id));
       toast.success(`Follow-up with ${f.clients?.name ?? "client"} marked complete`);
     });
@@ -131,7 +155,7 @@ function FollowUpsPage() {
 
   const handleStop = async (f: FollowUpWithClient) => {
     await withBusy(f.id, async () => {
-      await cancelFollowUp(f.id);
+      await cancelFollowUp(f.id, companyId);
       setFollowUps(prev => prev.filter(x => x.id !== f.id));
       toast.success("Follow-up stopped");
     });

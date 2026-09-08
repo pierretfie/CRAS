@@ -212,10 +212,16 @@ function NewClient() {
           companyId,
         );
 
-        // Notify admins (fire-and-forget)
+        // Notify admins (fire-and-forget) — use query for self-hosted routing
         try {
-          const { data: profileData } = await supabase.from("profiles").select("name").eq("id", u.user.id).single();
-          const byName: string = (profileData as any)?.name ?? "Someone";
+          let byName = "Someone";
+          if (companyId) {
+            const profRes = await query(`SELECT name FROM profiles WHERE id = $1`, [u.user.id], companyId);
+            byName = (profRes.data as any[])?.[0]?.name ?? byName;
+          } else {
+            const { data: profileData } = await supabase.from("profiles").select("name").eq("id", u.user.id).single();
+            byName = (profileData as any)?.name ?? byName;
+          }
           notifyNewClient(
             client.id,
             form.name.trim(),

@@ -6,6 +6,8 @@ import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover
 import { cancelFollowUp, completeFollowUp, logFollowUp, FollowUp } from "@/lib/follow-ups";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { query } from "@/lib/db";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 
@@ -20,13 +22,32 @@ interface FollowUpWithClient extends FollowUp {
 
 function FollowUpNotifications() {
   const { u } = useAuth();
+  const { data: me } = useCurrentUser();
+  const companyId = me?.company?.id as string | undefined;
   const [followUps, setFollowUps] = useState<FollowUpWithClient[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const navigate = useNavigate();
 
-  const fetchFollowUps = () => {
+  const fetchFollowUps = async () => {
     if (!u?.user?.id) return;
+    if (companyId) {
+      const res = await query(
+        `SELECT f.*, c.name, c.product, c.current_stage, c.interest_scale
+         FROM client_follow_ups f
+         LEFT JOIN clients c ON c.id = f.client_id AND c.company_id = $2
+         WHERE f.user_id = $1 AND f.status = 'active'
+         ORDER BY f.next_reminder ASC`,
+        [u.user.id, companyId],
+        companyId,
+      );
+      const mapped = ((res.data as any[]) ?? []).map((r: any) => ({
+        ...r,
+        clients: r.name ? { name: r.name, product: r.product, current_stage: r.current_stage, interest_scale: r.interest_scale } : null,
+      }));
+      setFollowUps(mapped as FollowUpWithClient[]);
+      return;
+    }
     supabase
       .from("client_follow_ups")
       .select("*, clients!client_follow_ups_client_id_fkey(name, product, current_stage, interest_scale)")
@@ -36,7 +57,7 @@ function FollowUpNotifications() {
       .then(({ data }) => setFollowUps((data as unknown as FollowUpWithClient[]) ?? []));
   };
 
-  useEffect(() => { fetchFollowUps(); }, [u?.user?.id]);
+  useEffect(() => { void fetchFollowUps(); }, [u?.user?.id, companyId]);
 
   const withLoading = async (id: string, fn: () => Promise<void>) => {
     setLoading(prev => ({ ...prev, [id]: true }));
@@ -46,7 +67,7 @@ function FollowUpNotifications() {
   // "Followed up" — log the contact, reschedule, keep active
   const handleFollowedUp = async (followUp: FollowUpWithClient) => {
     await withLoading(followUp.id, async () => {
-      const updated = await logFollowUp(followUp);
+      const updated = await logFollowUp(followUp, null, null, companyId);
       setFollowUps(prev => prev.map(f =>
         f.id === followUp.id ? { ...f, next_reminder: updated.next_reminder } : f
       ));
@@ -58,7 +79,7 @@ function FollowUpNotifications() {
   // "Done" — follow-up is fully resolved, no more reminders
   const handleDone = async (id: string, clientName: string) => {
     await withLoading(id, async () => {
-      await completeFollowUp(id);
+      await completeFollowUp(id, companyId);
       setFollowUps(prev => prev.filter(f => f.id !== id));
       toast.success(`Follow-up with ${clientName} marked complete`);
     });
@@ -67,7 +88,7 @@ function FollowUpNotifications() {
   // "Stop" — stop the recurring reminder entirely
   const handleStop = async (id: string) => {
     await withLoading(id, async () => {
-      await cancelFollowUp(id);
+      await cancelFollowUp(id, companyId);
       setFollowUps(prev => prev.filter(f => f.id !== id));
       toast.success("Follow-up stopped");
     });
