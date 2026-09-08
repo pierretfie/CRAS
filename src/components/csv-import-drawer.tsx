@@ -102,12 +102,14 @@ export function CsvImportDrawer({ open, onClose, onImported }: CsvImportDrawerPr
   });
 
   const { data: products } = useQuery({
-    queryKey: ["admin_products"],
-    queryFn: async () =>
-      ((await supabase.from("admin_products").select("*").order("name")).data ?? []) as {
-        id: string;
-        name: string;
-      }[],
+    queryKey: ["admin_products", companyId],
+    queryFn: async () => {
+      if (!companyId) return [];
+      const res = await query("SELECT * FROM admin_products WHERE company_id = $1 ORDER BY name", [companyId], companyId);
+      if (res.error) throw res.error;
+      return (res.data ?? []) as { id: string; name: string }[];
+    },
+    enabled: !!companyId,
   });
 
   const { data: stages } = useQuery({
@@ -301,7 +303,7 @@ export function CsvImportDrawer({ open, onClose, onImported }: CsvImportDrawerPr
 
         if (row.followUpEnabled) {
           try {
-            await createFollowUp(client.id, u.user.id, row.followUpFrequency, null);
+            await createFollowUp(client.id, u.user.id, row.followUpFrequency, null, undefined, companyId);
           } catch {
             // follow-up failure is non-fatal
           }

@@ -89,12 +89,23 @@ export const adminToggleUserActive = createServerFn({ method: "POST" })
       if (error) throw new Error(error.message);
     }
 
-    // Update profile
+    // Update profile in central (Supabase) + external if self-hosted
     const { error: dbErr } = await supabaseAdmin
       .from("profiles")
       .update({ active: data.active })
       .eq("id", data.userId);
     if (dbErr) throw new Error(dbErr.message);
+
+    // Also update external DB for self-hosted companies via tenant routing
+    try {
+      const { data: prof } = await supabaseAdmin.from("profiles").select("company_id").eq("id", data.userId).single();
+      const companyId = (prof as any)?.company_id as string | undefined;
+      if (companyId) {
+        const { queryServer } = await import("@/lib/db.server");
+        const res = await queryServer("UPDATE profiles SET active = $1, updated_at = now() WHERE id = $2", [data.active, data.userId], companyId);
+        if (res.error) console.warn("[adminToggleUserActive] external update failed", res.error);
+      }
+    } catch (e) { console.warn("[adminToggleUserActive] external sync skipped", e); }
 
     return { success: true };
   });
@@ -123,12 +134,22 @@ export const adminUpdateUserEmail = createServerFn({ method: "POST" })
     );
     if (authErr) throw new Error(authErr.message);
 
-    // Sync profiles table
+    // Sync profiles table in central + external
     const { error: dbErr } = await supabaseAdmin
       .from("profiles")
       .update({ email: data.email })
       .eq("id", data.userId);
     if (dbErr) throw new Error(dbErr.message);
+
+    try {
+      const { data: prof } = await supabaseAdmin.from("profiles").select("company_id").eq("id", data.userId).single();
+      const companyId = (prof as any)?.company_id as string | undefined;
+      if (companyId) {
+        const { queryServer } = await import("@/lib/db.server");
+        const res = await queryServer("UPDATE profiles SET email = $1, updated_at = now() WHERE id = $2", [data.email, data.userId], companyId);
+        if (res.error) console.warn("[adminUpdateUserEmail] external update failed", res.error);
+      }
+    } catch (e) { console.warn("[adminUpdateUserEmail] external sync skipped", e); }
 
     return { success: true };
   });

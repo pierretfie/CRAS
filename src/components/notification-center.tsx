@@ -69,8 +69,15 @@ export function NotificationCenter() {
 
   // ── Data fetching ──────────────────────────────────────────────────────
 
-  const fetchNotifs = useCallback(() => {
+  const fetchNotifs = useCallback(async () => {
     if (!userId) return;
+    const companyId = (me as any)?.company?.id as string | undefined;
+    if (companyId) {
+      const { query } = await import("@/lib/db");
+      const res = await query(`SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 40`, [userId], companyId);
+      setNotifs(((res.data as any[]) ?? []) as AppNotification[]);
+      return;
+    }
     supabase
       .from("notifications")
       .select("*")
@@ -78,10 +85,32 @@ export function NotificationCenter() {
       .order("created_at", { ascending: false })
       .limit(40)
       .then(({ data }) => setNotifs((data ?? []) as AppNotification[]));
-  }, [userId]);
+  }, [userId, (me as any)?.company?.id]);
 
-  const fetchFollowUps = useCallback(() => {
+  const fetchFollowUps = useCallback(async () => {
     if (!userId) return;
+    const companyId = (me as any)?.company?.id as string | undefined;
+    if (companyId) {
+      const { query } = await import("@/lib/db");
+      // Self-hosted: join via company-scoped query
+      const res = await query(
+        `SELECT f.*, c.name, c.product, c.current_stage, c.interest_scale,
+                p.name as created_by_name, p.department as created_by_dept
+         FROM client_follow_ups f
+         LEFT JOIN clients c ON c.id = f.client_id
+         LEFT JOIN profiles p ON p.id = c.created_by
+         WHERE f.user_id = $1 AND f.status = 'active'
+         ORDER BY f.next_reminder ASC`,
+        [userId],
+        companyId,
+      );
+      const mapped = ((res.data as any[]) ?? []).map((r: any) => ({
+        ...r,
+        clients: r.name ? { name: r.name, product: r.product, current_stage: r.current_stage, interest_scale: r.interest_scale, created_by_name: r.created_by_name, created_by_dept: r.created_by_dept } : null,
+      }));
+      setFollowUps(mapped as FollowUpWithClient[]);
+      return;
+    }
     supabase
       .from("client_follow_ups")
       .select(`*, clients!client_follow_ups_client_id_fkey(
@@ -93,7 +122,7 @@ export function NotificationCenter() {
       .then(({ data }) => {
         setFollowUps((data ?? []) as FollowUpWithClient[]);
       });
-  }, [userId]);
+  }, [userId, (me as any)?.company?.id]);
 
   useEffect(() => {
     fetchNotifs();
@@ -125,13 +154,20 @@ export function NotificationCenter() {
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
           // Re-fetch in case notifications arrived during subscribe handshake
-          supabase
-            .from("notifications")
-            .select("*")
-            .eq("user_id", userId)
-            .order("created_at", { ascending: false })
-            .limit(40)
-            .then(({ data }) => setNotifs((data ?? []) as AppNotification[]));
+          const companyId = (me as any)?.company?.id as string | undefined;
+          if (companyId) {
+            import("@/lib/db").then(({ query }) =>
+              query(`SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 40`, [userId], companyId).then((res) => setNotifs(((res.data as any[]) ?? []) as AppNotification[]))
+            );
+          } else {
+            supabase
+              .from("notifications")
+              .select("*")
+              .eq("user_id", userId)
+              .order("created_at", { ascending: false })
+              .limit(40)
+              .then(({ data }) => setNotifs((data ?? []) as AppNotification[]));
+          }
         }
       });
 
@@ -178,17 +214,19 @@ export function NotificationCenter() {
     }
     setRespondingTo(n.id);
     try {
+      const companyId = (me as any)?.company?.id as string | undefined;
       // Find requester_id from the request row
-      const { data: req } = await supabase
-        .from("client_access_requests")
-        .select("requester_id")
-        .eq("id", requestId)
-        .single();
-
-      await supabase
-        .from("client_access_requests")
-        .update({ status: approved ? "approved" : "rejected" })
-        .eq("id", requestId);
+      let req: any = null;
+      if (companyId) {
+        const { query } = await import("@/lib/db");
+        const res = await query(`SELECT requester_id FROM client_access_requests WHERE id = $1`, [requestId], companyId);
+        req = (res.data as any[])?.[0] ?? null;
+        await query(`UPDATE client_access_requests SET status = $1, updated_at = now() WHERE id = $2`, [approved ? "approved" : "rejected", requestId], companyId);
+      } else {
+        const { data } = await supabase.from("client_access_requests").select("requester_id").eq("id", requestId).single();
+        req = data;
+        await supabase.from("client_access_requests").update({ status: approved ? "approved" : "rejected" }).eq("id", requestId);
+      }
 
       const ownerName: string = me?.profile?.name ?? me?.profile?.full_name ?? "The client owner";
       const clientName = (n.payload as any)?.clientName as string ?? "the client";

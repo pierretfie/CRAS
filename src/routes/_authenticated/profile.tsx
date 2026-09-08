@@ -42,12 +42,13 @@ function ProfilePage() {
     if (!name.trim()) return toast.error("Name cannot be empty");
     setProfileSaving(true);
     try {
-      // Update name + department in profiles
-      const { error: profileErr } = await supabase
-        .from("profiles")
-        .update({ name: name.trim(), department: department.trim() || null })
-        .eq("id", me.user.id);
-      if (profileErr) throw profileErr;
+      // Update name + department in profiles — use query so self-hosted (deities) routes correctly
+      const res = await query(
+        `UPDATE profiles SET name = $1, department = $2, updated_at = now() WHERE id = $3`,
+        [name.trim(), department.trim() || null, me.user.id],
+        me.company?.id,
+      );
+      if (res.error) throw res.error;
 
       // Update email in auth if changed — triggers confirmation email
       const trimmedEmail = email.trim().toLowerCase();

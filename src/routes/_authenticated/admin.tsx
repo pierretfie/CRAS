@@ -927,9 +927,16 @@ function CategoriesTab() {
 function ProductsTab() {
   const qc = useQueryClient();
   const { data: me } = useCurrentUser();
+  const companyId = me?.profile?.company_id ?? me?.company?.id;
   const { data: products } = useQuery({
-    queryKey: ["admin_products"],
-    queryFn: async () => (await supabase.from("admin_products").select("*").order("name")).data ?? [],
+    queryKey: ["admin_products", companyId],
+    queryFn: async () => {
+      if (!companyId) return [];
+      const res = await query("SELECT * FROM admin_products WHERE company_id = $1 ORDER BY name", [companyId], companyId);
+      if (res.error) throw res.error;
+      return (res.data as any[]) ?? [];
+    },
+    enabled: !!companyId,
   });
   const [name, setName] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -937,21 +944,22 @@ function ProductsTab() {
 
   async function add() {
     if (!name.trim()) return;
-    const companyId = me?.profile?.company_id;
     if (!companyId) return toast.error("Company not found — cannot add product");
-    const { error } = await supabase.from("admin_products").insert({ name: name.trim(), company_id: companyId });
-    if (error) toast.error(error.message);
+    const res = await query("INSERT INTO admin_products (name, company_id) VALUES ($1,$2)", [name.trim(), companyId], companyId);
+    if (res.error) toast.error(res.error.message);
     else { setName(""); qc.invalidateQueries({ queryKey: ["admin_products"] }); }
   }
   async function update(id: string) {
     if (!editName.trim()) return;
-    const { error } = await supabase.from("admin_products").update({ name: editName.trim() }).eq("id", id);
-    if (error) toast.error(error.message);
+    if (!companyId) return toast.error("No workspace");
+    const res = await query("UPDATE admin_products SET name = $1 WHERE id = $2 AND company_id = $3", [editName.trim(), id, companyId], companyId);
+    if (res.error) toast.error(res.error.message);
     else { setEditingId(null); qc.invalidateQueries({ queryKey: ["admin_products"] }); }
   }
   async function del(id: string) {
-    const { error } = await supabase.from("admin_products").delete().eq("id", id);
-    if (error) toast.error(error.message);
+    if (!companyId) return toast.error("No workspace");
+    const res = await query("DELETE FROM admin_products WHERE id = $1 AND company_id = $2", [id, companyId], companyId);
+    if (res.error) toast.error(res.error.message);
     else qc.invalidateQueries({ queryKey: ["admin_products"] });
   }
 

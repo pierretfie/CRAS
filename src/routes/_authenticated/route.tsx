@@ -119,7 +119,10 @@ function AuthedLayout() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       try {
-        const followUps = await getActiveFollowUps(user.id);
+        const { query } = await import("@/lib/db");
+        const profRes = await query("select company_id from profiles where id = $1", [user.id]);
+        const companyId = (profRes.data as any[])?.[0]?.company_id ?? null;
+        const followUps = await getActiveFollowUps(user.id, companyId);
         checkOverdueFollowUps(followUps);
       } catch {}
     }

@@ -68,21 +68,16 @@ function SubClientsCard({ clientId, clientName, subClients, onAdded }: { clientI
 
     const { data: meData } = await supabase.from("profiles").select("company_id").eq("id", u.user.id).single();
     const companyId = (meData as any)?.company_id;
+    if (!companyId) { setSaving(false); return toast.error("No workspace — refresh and try again"); }
 
-    const { error } = await supabase.from("clients").insert({
-      name: form.name.trim(),
-      email: form.email.trim() || null,
-      location: form.location.trim() || null,
-      contact_person_phone: form.phone.trim() || null,
-      contact_person: form.company_name.trim() || null,
-      category: "Other",
-      mode_of_connection: "referral_intro",
-      parent_client_id: clientId,
-      created_by: u.user.id,
-      company_id: companyId,
-    });
+    const res = await query(
+      `INSERT INTO clients (name, email, location, contact_person_phone, contact_person, category, mode_of_connection, parent_client_id, created_by, company_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      [form.name.trim(), form.email.trim() || null, form.location.trim() || null, form.phone.trim() || null, form.company_name.trim() || null, "Other", "referral_intro", clientId, u.user.id, companyId],
+      companyId,
+    );
     setSaving(false);
-    if (error) return toast.error(error.message);
+    if (res.error) return toast.error(res.error.message);
     toast.success(`${form.name} added under ${clientName}`);
     setForm({ name: "", email: "", phone: "", location: "", company_name: "" });
     setOpen(false);
@@ -218,11 +213,17 @@ function ClientDetail() {
     enabled: !!client?.category && !!me?.company?.id,
   });
 
-  // Check access: owner, admin, or has an approved request
+  // Check access: owner, admin, or has an approved request — use query for self-hosted routing
   const { data: accessRequest } = useQuery({
-    queryKey: ["access-request", id, me?.user?.id],
+    queryKey: ["access-request", id, me?.user?.id, me?.company?.id],
     enabled: !!me && !!client && !me.isAdmin && client?.created_by !== me?.user?.id,
     queryFn: async () => {
+      const companyId = me?.company?.id;
+      if (companyId) {
+        const res = await query(`SELECT * FROM client_access_requests WHERE client_id = $1 AND requester_id = $2 LIMIT 1`, [id, me!.user!.id], companyId);
+        if (res.error) throw res.error;
+        return (res.data as any[])?.[0] ?? null;
+      }
       const { data } = await supabase
         .from("client_access_requests")
         .select("*")
@@ -394,15 +395,32 @@ function LockedClientView({
   async function sendRequest() {
     setSending(true);
     try {
-      // Upsert request row and get back the row ID
-      const { data: upserted, error } = await supabase.from("client_access_requests").upsert({
-        client_id: client.id,
-        requester_id: me.user.id,
-        owner_id: client.created_by,
-        message: message.trim() || null,
-        status: "pending",
-      }, { onConflict: "client_id,requester_id" }).select("id").single();
-      if (error) throw error;
+      const companyId = (me as any)?.company?.id ?? null;
+      // Upsert request row and get back the row ID — use query for self-hosted routing
+      let upserted: any;
+      if (companyId) {
+        const res = await query(
+          `INSERT INTO client_access_requests (client_id, requester_id, owner_id, message, status)
+           VALUES ($1,$2,$3,$4,'pending')
+           ON CONFLICT (client_id, requester_id) DO UPDATE SET message = EXCLUDED.message, status = 'pending', updated_at = now()
+           RETURNING id`,
+          [client.id, me.user.id, client.created_by, message.trim() || null],
+          companyId,
+        );
+        if (res.error) throw res.error;
+        upserted = (res.data as any[])[0];
+      } else {
+        const { data, error } = await supabase.from("client_access_requests").upsert({
+          client_id: client.id,
+          requester_id: me.user.id,
+          owner_id: client.created_by,
+          message: message.trim() || null,
+          status: "pending",
+        }, { onConflict: "client_id,requester_id" }).select("id").single();
+        if (error) throw error;
+        upserted = data;
+      }
+      if (!upserted) throw new Error("Failed to create request");
 
       // Notify the owner — pass the actual access request row ID so the
       // notification center can respond inline without a page navigation
@@ -564,11 +582,17 @@ function AccessRequestManager({ clientId }: { clientId: string }) {
 
   async function respond(requestId: string, requesterId: string, approved: boolean) {
     try {
-      const { error } = await supabase
-        .from("client_access_requests")
-        .update({ status: approved ? "approved" : "rejected" })
-        .eq("id", requestId);
-      if (error) throw error;
+      const companyId = (me as any)?.company?.id ?? null;
+      if (companyId) {
+        const res = await query(`UPDATE client_access_requests SET status = $1, updated_at = now() WHERE id = $2`, [approved ? "approved" : "rejected", requestId], companyId);
+        if (res.error) throw res.error;
+      } else {
+        const { error } = await supabase
+          .from("client_access_requests")
+          .update({ status: approved ? "approved" : "rejected" })
+          .eq("id", requestId);
+        if (error) throw error;
+      }
 
       const ownerName: string = me?.profile?.name ?? me?.profile?.full_name ?? "The client owner";
 
@@ -644,19 +668,26 @@ function Detail({ k, v }: { k: string; v: string | null | undefined }) {
 function EditClientDialog({ client, onSaved }: { client: { id: string; name: string; email: string | null; location: string | null; contact_person: string | null; contact_person_phone: string | null; contact_person_email: string | null; contact_person_role: string | null; product: string | null; interest_scale: number | null; parent_client_id: string | null; category: string }; onSaved: () => void }) {
   const [open, setOpen] = useState(false);
   const { data: me } = useCurrentUser();
+  const companyId = me?.company?.id;
   const { data: products } = useQuery({
-    queryKey: ["admin_products"],
-    queryFn: async () => (await supabase.from("admin_products").select("*").order("name")).data ?? [],
+    queryKey: ["admin_products", companyId],
+    queryFn: async () => {
+      if (!companyId) return [];
+      const res = await query("SELECT * FROM admin_products WHERE company_id = $1 ORDER BY name", [companyId], companyId);
+      if (res.error) throw res.error;
+      return (res.data as any[]) ?? [];
+    },
+    enabled: !!companyId,
   });
   const { data: categories } = useQuery({
-    queryKey: ["admin_categories", me?.company?.id],
+    queryKey: ["admin_categories", companyId],
     queryFn: async () => {
-      if (!me?.company?.id) return [];
-      const res = await query('SELECT * FROM admin_categories WHERE company_id = $1 ORDER BY name', [me.company.id], me.company.id);
+      if (!companyId) return [];
+      const res = await query('SELECT * FROM admin_categories WHERE company_id = $1 ORDER BY name', [companyId], companyId);
       if (res.error) throw res.error;
       return res.data;
     },
-    enabled: !!me?.company?.id && open,
+    enabled: !!companyId && open,
   });
   const [form, setForm] = useState({
     name: client.name,
@@ -675,18 +706,14 @@ function EditClientDialog({ client, onSaved }: { client: { id: string; name: str
 
   async function save() {
     setSaving(true);
-    const { error } = await supabase.from("clients").update({
-      name: form.name,
-      email: form.email || null,
-      location: form.location || null,
-      contact_person: form.contact_person || null,
-      contact_person_phone: form.contact_person_phone || null,
-      contact_person_email: form.contact_person_email || null,
-      contact_person_role: form.contact_person_role || null,
-      product: form.product || null,
-      category: form.customCategory.trim() || form.category || client.category,
-      interest_scale: interestScale,
-    }).eq("id", client.id);
+    const companyId = (me as any)?.company?.id ?? null;
+    if (!companyId) { setSaving(false); return toast.error("No workspace — refresh and try again"); }
+    const res = await query(
+      `UPDATE clients SET name = $1, email = $2, location = $3, contact_person = $4, contact_person_phone = $5, contact_person_email = $6, contact_person_role = $7, product = $8, category = $9, interest_scale = $10, updated_at = now() WHERE id = $11 AND company_id = $12`,
+      [form.name, form.email || null, form.location || null, form.contact_person || null, form.contact_person_phone || null, form.contact_person_email || null, form.contact_person_role || null, form.product || null, form.customCategory.trim() || form.category || client.category, interestScale, client.id, companyId],
+      companyId,
+    );
+    const error = (res as any).error as Error | null;
     setSaving(false);
     if (error) return toast.error(error.message);
     toast.success("Saved");
@@ -876,38 +903,37 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
     // If client was just marked won or lost — cancel all active follow-ups automatically
     if (mode === "won" || mode === "lost") {
       try {
-        await supabase
-          .from("client_follow_ups")
-          .update({ status: "cancelled" })
-          .eq("client_id", client.id)
-          .eq("status", "active");
+        const companyId = me?.company?.id ?? null;
+        if (companyId) {
+          await query(`UPDATE client_follow_ups SET status = 'cancelled', updated_at = now() WHERE client_id = $1 AND status = 'active'`, [client.id], companyId);
+        } else {
+          await supabase.from("client_follow_ups").update({ status: "cancelled" }).eq("client_id", client.id).eq("status", "active");
+        }
       } catch { /* non-critical */ }
     }
 
     // If an active follow-up exists for this client, auto-log it with the same activity type.
-    // This means updating a stage after a contact also counts as the follow-up check-in —
-    // the user doesn't need to log it separately in the follow-up section.
     if (activityType) {
       try {
-        const { data: activeFollowUps } = await supabase
-          .from("client_follow_ups")
-          .select("*")
-          .eq("client_id", client.id)
-          .eq("user_id", u.user.id)
-          .eq("status", "active");
+        const companyId = me?.company?.id ?? null;
+        let activeFollowUps: any[] = [];
+        if (companyId) {
+          const res = await query(`SELECT * FROM client_follow_ups WHERE client_id = $1 AND user_id = $2 AND status = 'active'`, [client.id, u.user.id], companyId);
+          activeFollowUps = (res.data as any[]) ?? [];
+        } else {
+          const { data } = await supabase.from("client_follow_ups").select("*").eq("client_id", client.id).eq("user_id", u.user.id).eq("status", "active");
+          activeFollowUps = (data as any[]) ?? [];
+        }
         const { logFollowUp } = await import("@/lib/follow-ups");
         const { isLoggedThisCycle } = await import("@/lib/follow-ups");
         const { getFollowUpLogs } = await import("@/lib/follow-ups");
         if (activeFollowUps && activeFollowUps.length > 0) {
-          const logs = await getFollowUpLogs(client.id);
+          const logs = await getFollowUpLogs(client.id, companyId);
           for (const fu of activeFollowUps) {
-            // Find most recent log for this specific follow-up
-            const lastLog = logs
-              .filter((l: any) => l.follow_up_id === fu.id)
-              .sort((a: any, b: any) => new Date(b.logged_at).getTime() - new Date(a.logged_at).getTime())[0] ?? null;
+            const lastLog = logs.filter((l: any) => l.follow_up_id === fu.id).sort((a: any, b: any) => new Date(b.logged_at).getTime() - new Date(a.logged_at).getTime())[0] ?? null;
             const alreadyLogged = isLoggedThisCycle(fu.next_reminder, fu.frequency, fu.custom_interval_days, lastLog?.logged_at ?? null);
             if (!alreadyLogged) {
-              await logFollowUp(fu, activityType);
+              await logFollowUp(fu, activityType, null, companyId);
             }
           }
         }
@@ -918,7 +944,7 @@ function StageUpdateDialog({ client, onSaved }: { client: { id: string; current_
 
     if (followUpEnabled) {
       try {
-        await createFollowUp(client.id, u.user.id, followUpFrequency, followUpNote || null);
+        await createFollowUp(client.id, u.user.id, followUpFrequency, followUpNote || null, undefined, me?.company?.id);
         toast.success("Follow-up scheduled");
       } catch (err) {
         toast.error("Failed to schedule follow-up");

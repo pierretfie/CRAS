@@ -78,15 +78,14 @@ function ClientsList() {
   });
 
   const { data: products } = useQuery({
-    queryKey: ["admin_products"],
+    queryKey: ["admin_products", companyId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("admin_products")
-        .select("*")
-        .order("name");
-      if (error) throw error;
-      return data;
+      if (!companyId) return [];
+      const res = await query("SELECT * FROM admin_products WHERE company_id = $1 ORDER BY name", [companyId], companyId);
+      if (res.error) throw res.error;
+      return (res.data as any[]) ?? [];
     },
+    enabled: !!companyId,
   });
 
   const [productFilter, setProductFilter] = useState("all");

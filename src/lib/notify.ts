@@ -173,10 +173,22 @@ export async function notifyAccessResponse(
 }
 
 export async function markNotificationRead(id: string): Promise<void> {
+  const companyId = await getCurrentCompanyId();
+  if (companyId) {
+    const res = await query(`update notifications set read = true where id = $1 and company_id = $2`, [id, companyId], companyId);
+    if (res.error) console.error("[notify] mark read failed", res.error);
+    return;
+  }
   await supabase.from("notifications").update({ read: true }).eq("id", id);
 }
 
 export async function markAllNotificationsRead(userId: string): Promise<void> {
+  const companyId = await getCurrentCompanyId();
+  if (companyId) {
+    const res = await query(`update notifications set read = true where user_id = $1 and read = false and company_id = $2`, [userId, companyId], companyId);
+    if (res.error) console.error("[notify] mark all read failed", res.error);
+    return;
+  }
   await supabase
     .from("notifications")
     .update({ read: true })

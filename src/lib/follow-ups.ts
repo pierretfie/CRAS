@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { query } from "@/lib/db";
 
 export interface FollowUp {
   id: string;
@@ -95,7 +96,16 @@ export interface FollowUpLog {
   logged_at: string;
 }
 
-export async function getActiveFollowUps(userId: string): Promise<FollowUp[]> {
+export async function getActiveFollowUps(userId: string, companyId?: string | null): Promise<FollowUp[]> {
+  if (companyId) {
+    const res = await query(
+      `SELECT * FROM client_follow_ups WHERE user_id = $1 AND status = 'active' ORDER BY next_reminder ASC`,
+      [userId],
+      companyId,
+    );
+    if (res.error) throw res.error;
+    return (res.data as FollowUp[]) ?? [];
+  }
   const { data, error } = await supabase
     .from("client_follow_ups")
     .select("*")
@@ -111,9 +121,20 @@ export async function createFollowUp(
   userId: string,
   frequency: string,
   note: string | null,
-  customIntervalDays?: number
+  customIntervalDays?: number,
+  companyId?: string | null,
 ): Promise<FollowUp> {
   const nextReminder = computeNextReminder(frequency, customIntervalDays);
+  if (companyId) {
+    const res = await query(
+      `INSERT INTO client_follow_ups (client_id, user_id, frequency, custom_interval_days, note, next_reminder, status)
+       VALUES ($1,$2,$3,$4,$5,$6,'active') RETURNING *`,
+      [clientId, userId, frequency, customIntervalDays || null, note, nextReminder.toISOString()],
+      companyId,
+    );
+    if (res.error) throw res.error;
+    return (res.data as FollowUp[])[0];
+  }
   const { data, error } = await supabase
     .from("client_follow_ups")
     .insert({
@@ -135,11 +156,29 @@ export async function createFollowUp(
  * "Followed up today" — logs the contact and reschedules next_reminder
  * based on the follow-up's frequency. The follow-up stays active.
  */
-export async function logFollowUp(followUp: FollowUp, activityType?: string | null, note?: string | null): Promise<FollowUp> {
+export async function logFollowUp(followUp: FollowUp, activityType?: string | null, note?: string | null, companyId?: string | null): Promise<FollowUp> {
   const nextReminder = computeNextReminder(
     followUp.frequency,
     followUp.custom_interval_days ?? undefined
   );
+
+  if (companyId) {
+    const logRes = await query(
+      `INSERT INTO follow_up_logs (follow_up_id, client_id, user_id, activity_type, note, logged_at)
+       VALUES ($1,$2,$3,$4,$5,$6)`,
+      [followUp.id, followUp.client_id, followUp.user_id, activityType ?? null, note || null, new Date().toISOString()],
+      companyId,
+    );
+    if (logRes.error) throw logRes.error;
+
+    const res = await query(
+      `UPDATE client_follow_ups SET next_reminder = $1, updated_at = $2 WHERE id = $3 RETURNING *`,
+      [nextReminder.toISOString(), new Date().toISOString(), followUp.id],
+      companyId,
+    );
+    if (res.error) throw res.error;
+    return (res.data as FollowUp[])[0];
+  }
 
   // Insert the log entry
   const { error: logError } = await supabase.from("follow_up_logs").insert({
@@ -169,7 +208,16 @@ export async function logFollowUp(followUp: FollowUp, activityType?: string | nu
 /**
  * Fetch the check-in history for a specific client, newest first.
  */
-export async function getFollowUpLogs(clientId: string): Promise<FollowUpLog[]> {
+export async function getFollowUpLogs(clientId: string, companyId?: string | null): Promise<FollowUpLog[]> {
+  if (companyId) {
+    const res = await query(
+      `SELECT * FROM follow_up_logs WHERE client_id = $1 ORDER BY logged_at DESC`,
+      [clientId],
+      companyId,
+    );
+    if (res.error) throw res.error;
+    return (res.data as FollowUpLog[]) ?? [];
+  }
   const { data, error } = await supabase
     .from("follow_up_logs")
     .select("*")
@@ -182,7 +230,12 @@ export async function getFollowUpLogs(clientId: string): Promise<FollowUpLog[]> 
 /**
  * "Done" — the follow-up is fully complete. No more reminders.
  */
-export async function completeFollowUp(id: string): Promise<void> {
+export async function completeFollowUp(id: string, companyId?: string | null): Promise<void> {
+  if (companyId) {
+    const res = await query(`UPDATE client_follow_ups SET status = 'completed', updated_at = $1 WHERE id = $2`, [new Date().toISOString(), id], companyId);
+    if (res.error) throw res.error;
+    return;
+  }
   const { error } = await supabase
     .from("client_follow_ups")
     .update({ status: "completed", updated_at: new Date().toISOString() })
@@ -193,7 +246,12 @@ export async function completeFollowUp(id: string): Promise<void> {
 /**
  * "Stop" — user no longer wants this recurring reminder.
  */
-export async function cancelFollowUp(id: string): Promise<void> {
+export async function cancelFollowUp(id: string, companyId?: string | null): Promise<void> {
+  if (companyId) {
+    const res = await query(`UPDATE client_follow_ups SET status = 'cancelled', updated_at = $1 WHERE id = $2`, [new Date().toISOString(), id], companyId);
+    if (res.error) throw res.error;
+    return;
+  }
   const { error } = await supabase
     .from("client_follow_ups")
     .update({ status: "cancelled", updated_at: new Date().toISOString() })

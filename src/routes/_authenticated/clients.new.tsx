@@ -69,8 +69,14 @@ function NewClient() {
     enabled: !!companyId,
   });
   const { data: products } = useQuery({
-    queryKey: ["admin_products"],
-    queryFn: async () => (await supabase.from("admin_products").select("*").order("name")).data ?? [],
+    queryKey: ["admin_products", companyId],
+    queryFn: async () => {
+      if (!companyId) return [];
+      const res = await query("SELECT * FROM admin_products WHERE company_id = $1 ORDER BY name", [companyId], companyId);
+      if (res.error) throw res.error;
+      return (res.data as any[]) ?? [];
+    },
+    enabled: !!companyId,
   });
 
   const { data: stages } = useQuery({
@@ -221,7 +227,7 @@ function NewClient() {
 
         if (followUpEnabled) {
           try {
-            await createFollowUp(client.id, u.user.id, followUpFrequency, followUpNote.trim() || null);
+            await createFollowUp(client.id, u.user.id, followUpFrequency, followUpNote.trim() || null, undefined, companyId);
             toast.success("Client created with follow-up scheduled");
           } catch {
             toast.success("Client created");
