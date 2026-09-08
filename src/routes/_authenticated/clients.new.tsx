@@ -166,44 +166,45 @@ function NewClient() {
       const cf: Record<string, string> = {};
       customFields.forEach((kv) => { if (kv.key.trim()) cf[kv.key.trim()] = kv.value; });
 
-      const { data: client, error } = await supabase.from("clients").insert({
-        name: form.name.trim(),
-        email: form.email.trim() || null,
-        location: form.location.trim() || null,
-        contact_person: form.contact_person.trim() || null,
-        contact_person_phone: form.contact_person_phone.trim() || null,
-        contact_person_email: form.contact_person_email.trim() || null,
-        contact_person_role: form.contact_person_role.trim() || null,
-        category: preview.category,
-        mode_of_connection: preview.modeOfConnection,
-        product: form.customProduct.trim() || form.product || null,
-        current_stage: form.stage,
-        stage_value: preview.stageValue,
-        stage_label: preview.stageLabel ?? null,
-        stage_notes: preview.normalizedDescription,
-        custom_fields: cf,
-        interest_scale: interestScale,
-        company_id: companyId,
-        created_by: u.user.id,
-        parent_client_id: parentClientId || null,
-      }).select("id").single();
-
-      if (error || !client) {
-        toast.error(error?.message ?? "Failed to save client");
+      // Use query() so self-hosted companies (deities) route to their external DB
+      // via getPool(companyId) instead of always writing to central Supabase
+      const insertRes = await query(
+        `INSERT INTO clients (name, email, location, contact_person, contact_person_phone, contact_person_email, contact_person_role, category, mode_of_connection, product, current_stage, stage_value, stage_label, stage_notes, custom_fields, interest_scale, company_id, created_by, parent_client_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb,$16,$17,$18,$19) RETURNING id`,
+        [
+          form.name.trim(),
+          form.email.trim() || null,
+          form.location.trim() || null,
+          form.contact_person.trim() || null,
+          form.contact_person_phone.trim() || null,
+          form.contact_person_email.trim() || null,
+          form.contact_person_role.trim() || null,
+          preview.category,
+          preview.modeOfConnection,
+          form.customProduct.trim() || form.product || null,
+          form.stage,
+          preview.stageValue,
+          preview.stageLabel ?? null,
+          preview.normalizedDescription,
+          JSON.stringify(cf),
+          interestScale,
+          companyId,
+          u.user.id,
+          parentClientId || null,
+        ],
+        companyId,
+      );
+      const client = (insertRes.data as any[])?.[0];
+      if (insertRes.error || !client) {
+        toast.error(insertRes.error?.message ?? "Failed to save client");
       } else {
         // Insert initial stage event so the description appears in the timeline
-        await supabase.from("client_stage_events").insert({
-          client_id: client.id,
-          user_id: u.user.id,
-          from_stage: null,
-          to_stage: form.stage,
-          event_type: "progress",
-          description: preview.normalizedDescription,
-          lost_reason: null,
-          stage_value: preview.stageValue,
-          activity_type: directActivityType || null,
-          interest_scale: interestScale,
-        });
+        await query(
+          `INSERT INTO client_stage_events (client_id, user_id, from_stage, to_stage, event_type, description, stage_value, interest_scale, activity_type)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+          [client.id, u.user.id, null, form.stage, "progress", preview.normalizedDescription, preview.stageValue, interestScale, directActivityType || null],
+          companyId,
+        );
 
         // Notify admins (fire-and-forget)
         try {

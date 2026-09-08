@@ -258,44 +258,43 @@ export function CsvImportDrawer({ open, onClose, onImported }: CsvImportDrawerPr
         const stageLabel =
           stages?.find(s => s.stage_number === row.normalizedStage)?.label ?? null;
 
-        const { data: client, error } = await supabase
-          .from("clients")
-          .insert({
-            name: row.name.trim(),
-            email: row.email.trim() || null,
-            location: row.location.trim() || null,
-            contact_person: row.contact_person.trim() || null,
-            contact_person_phone: row.contact_person_phone.trim() || null,
-            contact_person_email: row.contact_person_email.trim() || null,
-            contact_person_role: row.contact_person_role.trim() || null,
-            category: row.normalizedCategory,
-            mode_of_connection: row.normalizedMode,
-            product: row.product.trim() || null,
-            current_stage: row.normalizedStage,
-            stage_value: row.stageValue,
-            stage_label: stageLabel,
-            stage_notes: row.normalizedDescription,
-            interest_scale: row.interest_scale,
-            custom_fields: {},
-            company_id: companyId,
-            created_by: u.user.id,
-          })
-          .select("id")
-          .single();
+        // Use query() so self-hosted (deities) routes to external DB via getPool(companyId)
+        const insertRes = await query(
+          `INSERT INTO clients (name, email, location, contact_person, contact_person_phone, contact_person_email, contact_person_role, category, mode_of_connection, product, current_stage, stage_value, stage_label, stage_notes, interest_scale, custom_fields, company_id, created_by)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb,$17,$18) RETURNING id`,
+          [
+            row.name.trim(),
+            row.email.trim() || null,
+            row.location.trim() || null,
+            row.contact_person.trim() || null,
+            row.contact_person_phone.trim() || null,
+            row.contact_person_email.trim() || null,
+            row.contact_person_role.trim() || null,
+            row.normalizedCategory,
+            row.normalizedMode,
+            row.product.trim() || null,
+            row.normalizedStage,
+            row.stageValue,
+            stageLabel,
+            row.normalizedDescription,
+            row.interest_scale,
+            JSON.stringify({}),
+            companyId,
+            u.user.id,
+          ],
+          companyId,
+        );
+        const client = (insertRes.data as any[])?.[0];
+        const error = (insertRes as any).error as Error | null;
 
         if (error || !client) throw new Error(error?.message ?? "Insert failed");
 
-        await supabase.from("client_stage_events").insert({
-          client_id: client.id,
-          user_id: u.user.id,
-          from_stage: null,
-          to_stage: row.normalizedStage,
-          event_type: "progress",
-          description: row.normalizedDescription,
-          lost_reason: null,
-          stage_value: row.stageValue,
-          interest_scale: row.interest_scale,
-        });
+        await query(
+          `INSERT INTO client_stage_events (client_id, user_id, from_stage, to_stage, event_type, description, stage_value, interest_scale)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+          [client.id, u.user.id, null, row.normalizedStage, "progress", row.normalizedDescription, row.stageValue, row.interest_scale],
+          companyId,
+        );
 
         updateRow(row._id, { saved: true, error: null });
         successCount++;
