@@ -1334,8 +1334,14 @@ function ConsoleTab() {
       );
 
       try {
-        const { compileLatexToPdf: compileFn } = await import("@/lib/api/ai.functions");
-        const compiled = await compileFn({ data: { latex: finalLatex } });
+        const electronApi: any = (window as any)?.electronAPI;
+        let compiled: { pdf: string };
+        if (electronApi?.compileLatex) {
+          compiled = await electronApi.compileLatex(finalLatex);
+        } else {
+          const { compileLatexToPdf: compileFn } = await import("@/lib/api/ai.functions");
+          compiled = await compileFn({ data: { latex: finalLatex } });
+        }
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantId

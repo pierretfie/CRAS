@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // LaTeX
   checkLatex: () => ipcRenderer.invoke("app:check-latex"),
   installLatex: () => ipcRenderer.invoke("app:install-latex"),
+  compileLatex: (latex: string) => ipcRenderer.invoke("app:compile-latex", latex),
 
   // Update dialog
   onUpdateInfo: (cb: (data: { version: string; status: string }) => void) =>

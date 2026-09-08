@@ -351,3 +351,7 @@ ipcMain.handle("app:check-latex", () => isPdflatexAvailable());
 ipcMain.handle("app:install-latex", async () => {
   return tryAutoInstallPdflatex(mainWindow);
 });
+ipcMain.handle("app:compile-latex", async (_e, latex: string) => {
+  const { compileLatexLocally } = await import("./latex-installer.js");
+  return compileLatexLocally(latex);
+});

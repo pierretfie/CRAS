@@ -491,3 +491,76 @@ export async function tryAutoInstallPdflatex(parentWindow?: BrowserWindow | null
     child.on("error", () => resolve(false));
   });
 }
+
+/**
+ * Compile LaTeX locally via pdflatex (used by Electron to avoid Fly round-trip).
+ * Mirrors src/lib/api/ai.functions.ts tryCompile + sanitizeLatex but runs in main process.
+ */
+export async function compileLatexLocally(latex: string): Promise<{ pdf: string }> {
+  const { randomBytes, createHash } = await import("node:crypto");
+  const { mkdirSync, writeFileSync, readFileSync, existsSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const { execSync: execSync2 } = await import("node:child_process");
+  const { promisify } = await import("node:util");
+  const execAsync = promisify((await import("node:child_process")).exec);
+
+  function sanitizeLatex(tex: string): string {
+    const lines = tex.split("\n");
+    const result: string[] = [];
+    let inVerbatim = false;
+    for (const line of lines) {
+      if (/\\begin\{verbatim\}/.test(line)) { inVerbatim = true; result.push(line); continue; }
+      if (/\\end\{verbatim\}/.test(line)) { inVerbatim = false; result.push(line); continue; }
+      if (inVerbatim) { result.push(line); continue; }
+      if (/^\s*%/.test(line)) { result.push(line); continue; }
+      let l = line;
+      l = l.replace(/≥/g, "$\\geq$").replace(/≤/g, "$\\leq$");
+      l = l.replace(/—/g, "---").replace(/–/g, "--");
+      l = l.replace(/[\u{1F000}-\u{1FFFF}]/gu, "");
+      l = l.replace(/\u202F/g, " ").replace(/\u00A0/g, " ");
+      result.push(l);
+    }
+    let fixed = result.join("\n");
+    fixed = fixed.replace(/\\usepackage\[(\d+(?:\.\d+)?(?:in|cm|mm|pt))\]\{geometry\}/g, "\\usepackage[margin=$1]{geometry}");
+    return fixed;
+  }
+
+  const trimmed = latex.trim();
+  if (trimmed.length < 50 || !trimmed.includes("\\begin{document}") || !trimmed.includes("\\end{document}")) {
+    throw new Error("Generated LaTeX is empty or malformed — please try again.");
+  }
+
+  let pdflatex = "pdflatex";
+  try {
+    execSync2(process.platform === "win32" ? "where pdflatex" : "which pdflatex", { stdio: "ignore" });
+  } catch {
+    if (process.platform === "win32") {
+      const p = join(process.env.ProgramFiles || "C:\\Program Files", "MiKTeX", "miktex", "bin", "x64", "pdflatex.exe");
+      if (existsSync(p)) {
+        pdflatex = p;
+        process.env.PATH = path.dirname(p) + ";" + (process.env.PATH || "");
+      } else {
+        throw new Error("pdflatex not found. Please install MiKTeX via CRAS > Help > Install LaTeX.");
+      }
+    } else {
+      throw new Error("pdflatex not found. Install texlive: sudo apt-get install texlive-latex-recommended");
+    }
+  }
+
+  const tmpDir = join((await import("node:os")).tmpdir(), `cras-latex-${randomBytes(8).toString("hex")}`);
+  mkdirSync(tmpDir, { recursive: true });
+  const sanitized = sanitizeLatex(latex);
+  writeFileSync(join(tmpDir, "doc.tex"), sanitized);
+  const baseCmd = `"${pdflatex}" -interaction=nonstopmode -halt-on-error`;
+  try {
+    await execAsync(`${baseCmd} doc.tex`, { cwd: tmpDir, timeout: 30000 });
+    const pdfPath = join(tmpDir, "doc.pdf");
+    if (!existsSync(pdfPath)) throw new Error("No PDF produced");
+    return { pdf: readFileSync(pdfPath).toString("base64") };
+  } catch (e: any) {
+    let log = "";
+    try { log = readFileSync(join(tmpDir, "doc.log"), "utf-8"); } catch {}
+    const errLines = log.split("\n").filter((ln: string) => ln.startsWith("!") || ln.startsWith("l."));
+    throw new Error(errLines.slice(0, 5).join("; ") || e.message || "LaTeX compilation failed");
+  }
+}

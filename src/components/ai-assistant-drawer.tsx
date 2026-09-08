@@ -449,8 +449,15 @@ export function AIAssistantDrawer() {
       );
       
       try {
-        const { compileLatexToPdf } = await import("@/lib/api/ai.functions");
-        const compiled = await compileLatexToPdf({ data: { latex: finalLatex } });
+        // Electron: compile locally via main process (avoids Fly needing texlive) — falls back to server compile in browser
+        const electronApi: any = (window as any)?.electronAPI;
+        let compiled: { pdf: string };
+        if (electronApi?.compileLatex) {
+          compiled = await electronApi.compileLatex(finalLatex);
+        } else {
+          const { compileLatexToPdf } = await import("@/lib/api/ai.functions");
+          compiled = await compileLatexToPdf({ data: { latex: finalLatex } });
+        }
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantId
