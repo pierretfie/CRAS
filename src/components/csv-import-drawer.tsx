@@ -245,6 +245,7 @@ export function CsvImportDrawer({ open, onClose, onImported }: CsvImportDrawerPr
   async function saveAll() {
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return toast.error("Not signed in");
+    if (!companyId) return toast.error("No workspace — refresh and try again");
 
     setSaving(true);
     setStep("saving");
@@ -276,6 +277,7 @@ export function CsvImportDrawer({ open, onClose, onImported }: CsvImportDrawerPr
             stage_notes: row.normalizedDescription,
             interest_scale: row.interest_scale,
             custom_fields: {},
+            company_id: companyId,
             created_by: u.user.id,
           })
           .select("id")

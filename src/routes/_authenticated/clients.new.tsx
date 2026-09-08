@@ -157,6 +157,7 @@ function NewClient() {
 
   async function save() {
     if (!preview) return;
+    if (!companyId) { return toast.error("No workspace — refresh and try again"); }
     setSaving(true);
     try {
       const { data: u } = await supabase.auth.getUser();
@@ -182,6 +183,7 @@ function NewClient() {
         stage_notes: preview.normalizedDescription,
         custom_fields: cf,
         interest_scale: interestScale,
+        company_id: companyId,
         created_by: u.user.id,
         parent_client_id: parentClientId || null,
       }).select("id").single();
