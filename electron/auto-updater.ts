@@ -51,6 +51,9 @@ function createUpdateDialog(): BrowserWindow {
     return updateDialog;
   }
 
+  const preloadCjs = path.join(__dirname, "preload.cjs");
+  const preloadJs = path.join(__dirname, "preload.js");
+  const preloadPath = fs.existsSync(preloadCjs) ? preloadCjs : preloadJs;
   updateDialog = new BrowserWindow({
     width: 460,
     height: 320,
@@ -61,7 +64,7 @@ function createUpdateDialog(): BrowserWindow {
     backgroundColor: "#1a1a2e",
     parent: mainWindowRef ?? undefined,
     webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
+      preload: preloadPath,
       nodeIntegration: false,
       contextIsolation: true,
     },
