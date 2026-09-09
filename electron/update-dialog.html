@@ -5,143 +5,168 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Update</title>
 <style>
+  :root {
+    --background: oklch(0.16 0.01 260);
+    --foreground: oklch(0.98 0 0);
+    --card: oklch(0.20 0.012 260);
+    --card-foreground: oklch(0.98 0 0);
+    --primary: oklch(0.62 0.23 25);
+    --primary-foreground: oklch(0.99 0 0);
+    --secondary: oklch(0.26 0.012 260);
+    --secondary-foreground: oklch(0.98 0 0);
+    --muted: oklch(0.24 0.01 260);
+    --muted-foreground: oklch(0.70 0.012 260);
+    --border: oklch(0.28 0.01 260);
+    --destructive: oklch(0.62 0.23 25);
+    --radius: 0.625rem;
+  }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: #1a1a2e;
-    color: #e0e0e0;
+    background: var(--background);
+    color: var(--foreground);
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 100vh;
+    min-height: 100vh;
     overflow: hidden;
     user-select: none;
   }
   .dialog {
-    width: 420px;
-    padding: 32px 28px 24px;
-    background: #16213e;
-    border-radius: 16px;
-    border: 1px solid rgba(255,255,255,0.06);
+    width: 480px;
+    max-width: 92vw;
+    padding: 28px;
+    background: var(--card);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
     box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .header {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
   }
   .icon {
-    width: 48px;
-    height: 48px;
-    margin: 0 auto 16px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 12px;
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    background: var(--primary);
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
   }
-  .icon svg { width: 26px; height: 26px; fill: white; }
+  .icon svg { width: 22px; height: 22px; fill: var(--primary-foreground); }
+  .header-text { flex: 1; min-width: 0; }
   .title {
-    text-align: center;
-    font-size: 13px;
-    font-weight: 500;
-    color: #8892b0;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted-foreground);
     text-transform: uppercase;
-    letter-spacing: 1.2px;
-    margin-bottom: 6px;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
   }
   .version {
-    text-align: center;
-    font-size: 20px;
-    font-weight: 600;
-    color: #ccd6f6;
-    margin-bottom: 8px;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--card-foreground);
+    line-height: 1.2;
   }
   .description {
-    text-align: center;
-    font-size: 14px;
-    color: #8892b0;
+    font-size: 13px;
+    color: var(--muted-foreground);
     line-height: 1.6;
-    margin-bottom: 24px;
   }
-  .progress-container {
-    margin-bottom: 24px;
+  .progress-wrap {
     display: none;
   }
-  .progress-container.active { display: block; }
-  .progress-info {
+  .progress-wrap.active { display: block; }
+  .progress-head {
     display: flex;
     justify-content: space-between;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
     font-size: 12px;
-    color: #8892b0;
+    color: var(--muted-foreground);
   }
   .progress-bar {
     width: 100%;
     height: 6px;
-    background: rgba(255,255,255,0.06);
-    border-radius: 3px;
+    background: var(--muted);
+    border-radius: 999px;
     overflow: hidden;
   }
   .progress-fill {
     height: 100%;
     width: 0%;
-    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-    border-radius: 3px;
+    background: var(--primary);
+    border-radius: 999px;
     transition: width 0.3s ease;
   }
   .buttons {
     display: flex;
-    gap: 10px;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    margin-top: 4px;
   }
   .btn {
-    flex: 1;
-    padding: 12px 16px;
-    border-radius: 10px;
-    border: none;
-    font-size: 14px;
+    padding: 9px 16px;
+    border-radius: calc(var(--radius) - 2px);
+    border: 1px solid transparent;
+    font-size: 13px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.15s ease;
+    white-space: nowrap;
   }
-  .btn:hover { transform: translateY(-1px); }
-  .btn:active { transform: translateY(0); }
-  .btn-secondary {
-    background: rgba(255,255,255,0.06);
-    color: #ccd6f6;
-  }
-  .btn-secondary:hover { background: rgba(255,255,255,0.1); }
-  .btn-primary {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-  }
-  .btn-primary:hover { filter: brightness(1.1); }
+  .btn:active { transform: scale(0.98); }
   .btn-skip {
     background: transparent;
-    color: #e74c3c;
-    border: 1px solid rgba(231, 76, 60, 0.3);
+    color: var(--destructive);
+    border-color: color-mix(in oklch, var(--destructive) 30%, transparent);
+    margin-right: auto;
   }
-  .btn-skip:hover { background: rgba(231, 76, 60, 0.1); }
+  .btn-skip:hover { background: color-mix(in oklch, var(--destructive) 10%, transparent); }
+  .btn-secondary {
+    background: var(--secondary);
+    color: var(--secondary-foreground);
+    border-color: var(--border);
+  }
+  .btn-secondary:hover { background: var(--muted); }
+  .btn-primary {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+  .btn-primary:hover { filter: brightness(1.08); }
   .btn-primary:disabled {
-    opacity: 0.5;
+    opacity: 0.45;
     cursor: not-allowed;
-    transform: none;
     filter: none;
   }
 </style>
 </head>
 <body>
 <div class="dialog">
-  <div class="icon">
-    <svg viewBox="0 0 24 24"><path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3zm-1 14.5v-2h2v2h-2zm0-4V7h2v5.5h-2z"/></svg>
+  <div class="header">
+    <div class="icon">
+      <svg viewBox="0 0 24 24"><path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3zm-1 14.5v-2h2v2h-2zm0-4V7h2v5.5h-2z"/></svg>
+    </div>
+    <div class="header-text">
+      <div class="title">Update Available</div>
+      <div class="version" id="version">Checking…</div>
+    </div>
   </div>
-  <div class="title">Update Available</div>
-  <div class="version" id="version"></div>
-  <div class="description" id="description">A new version of CRAS is ready to install.</div>
+  <div class="description" id="description">A new version of CRAS is ready. You can update now or continue and update later.</div>
 
-  <div class="progress-container" id="progress">
-    <div class="progress-info">
-      <span id="progress-text">Downloading...</span>
+  <div class="progress-wrap" id="progress">
+    <div class="progress-head">
+      <span id="progress-text">Downloading…</span>
       <span id="progress-percent">0%</span>
     </div>
-    <div class="progress-bar">
-      <div class="progress-fill" id="progress-fill"></div>
-    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
   </div>
 
   <div class="buttons">
@@ -162,48 +187,37 @@
   var btnSkip = document.getElementById('btn-skip');
 
   function setupAPI() {
-    if (!window.electronAPI) {
-      setTimeout(setupAPI, 100);
-      return;
-    }
-
+    if (!window.electronAPI) { setTimeout(setupAPI, 100); return; }
     window.electronAPI.onUpdateInfo(function(data) {
       versionEl.textContent = 'v' + data.version;
       if (data.status === 'downloaded') {
-        descEl.textContent = 'Update downloaded and ready to install.';
+        descEl.textContent = 'Update downloaded and ready to install. Restart to apply.';
         progressEl.classList.remove('active');
         btnRestart.disabled = false;
         btnSkip.style.display = 'none';
         btnLater.style.display = 'inline-block';
         btnLater.textContent = 'Close';
+        progressFill.style.width = '100%';
+        progressPercent.textContent = '100%';
+        progressText.textContent = 'Ready to install';
+      } else if (data.status === 'available') {
+        versionEl.textContent = 'v' + data.version;
+        descEl.textContent = 'Downloading update… You can continue working.';
+        progressEl.classList.add('active');
+        btnRestart.disabled = true;
       }
     });
-
     window.electronAPI.onUpdateProgress(function(data) {
       progressEl.classList.add('active');
       progressFill.style.width = data.percent + '%';
       progressPercent.textContent = data.percent + '%';
-      if (data.percent < 100) {
-        progressText.textContent = 'Downloading...';
-      } else {
-        progressText.textContent = 'Download complete!';
-      }
+      progressText.textContent = data.percent < 100 ? 'Downloading…' : 'Download complete';
+      if (data.percent >= 100) { progressText.textContent = 'Download complete'; }
     });
-
-    btnRestart.addEventListener('click', function(e) {
-      e.preventDefault();
-      window.electronAPI.updateRestart();
-    });
-    btnLater.addEventListener('click', function(e) {
-      e.preventDefault();
-      window.electronAPI.updateLater();
-    });
-    btnSkip.addEventListener('click', function(e) {
-      e.preventDefault();
-      window.electronAPI.updateSkip();
-    });
+    btnRestart.addEventListener('click', function(e) { e.preventDefault(); if(!btnRestart.disabled) window.electronAPI.updateRestart(); });
+    btnLater.addEventListener('click', function(e) { e.preventDefault(); window.electronAPI.updateLater(); });
+    btnSkip.addEventListener('click', function(e) { e.preventDefault(); window.electronAPI.updateSkip(); });
   }
-
   setupAPI();
 </script>
 </body>

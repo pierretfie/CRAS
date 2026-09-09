@@ -55,13 +55,13 @@ function createUpdateDialog(): BrowserWindow {
   const preloadJs = path.join(__dirname, "preload.js");
   const preloadPath = fs.existsSync(preloadCjs) ? preloadCjs : preloadJs;
   updateDialog = new BrowserWindow({
-    width: 460,
-    height: 320,
+    width: 520,
+    height: 380,
     resizable: false,
     frame: true,
     skipTaskbar: true,
     center: true,
-    backgroundColor: "#1a1a2e",
+    backgroundColor: "#1a1d23",
     parent: mainWindowRef ?? undefined,
     webPreferences: {
       preload: preloadPath,
@@ -73,16 +73,32 @@ function createUpdateDialog(): BrowserWindow {
   if (isDialogHtmlAvailable()) {
     updateDialog.loadFile(dialogHtmlPath);
   } else {
+    // Fallback uses theme colors (oklch red primary) and a fitting layout — same structure as update-dialog.html
     updateDialog.loadURL(
-      `data:text/html,${encodeURIComponent(`<html><body style="font-family:system-ui;padding:30px;background:#1a1a2e;color:#fff;text-align:center;">
-        <h3 style="margin:0 0 12px;">Update Available</h3>
-        <p id="status" style="color:#aaa;margin:0 0 20px;">Preparing download...</p>
-        <div style="background:#333;border-radius:4px;height:6px;margin-bottom:20px;overflow:hidden;">
-          <div id="bar" style="background:#4ec9b0;height:100%;width:0%;transition:width 0.3s;"></div>
-        </div>
-        <button id="btn" onclick="window.electronAPI?.updateRestart?.()" style="display:none;padding:10px 24px;background:#4ec9b0;color:#000;border:none;border-radius:6px;font-size:14px;cursor:pointer;">Restart & Install</button>
-        <button onclick="window.electronAPI?.updateLater?.()" style="padding:10px 24px;background:transparent;color:#888;border:1px solid #444;border-radius:6px;font-size:14px;cursor:pointer;margin-left:8px;">Later</button>
-      </body></html>`)}`,
+      `data:text/html,${encodeURIComponent(`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+        :root{--bg:oklch(0.16 0.01 260);--card:oklch(0.20 0.012 260);--primary:oklch(0.62 0.23 25);--primary-fg:oklch(0.99 0 0);--secondary:oklch(0.26 0.012 260);--muted:oklch(0.24 0.01 260);--muted-fg:oklch(0.70 0.012 260);--border:oklch(0.28 0.01 260);--radius:0.625rem}
+        *{margin:0;padding:0;box-sizing:border-box}body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;background:var(--bg);color:oklch(0.98 0 0);display:flex;align-items:center;justify-content:center;min-height:100vh}
+        .d{width:480px;max-width:92vw;padding:28px;background:var(--card);border-radius:var(--radius);border:1px solid var(--border);box-shadow:0 20px 60px rgba(0,0,0,0.5);display:flex;flex-direction:column;gap:18px}
+        .h{display:flex;gap:14px;align-items:flex-start}.i{width:44px;height:44px;border-radius:10px;background:var(--primary);display:flex;align-items:center;justify-content:center;flex-shrink:0}.i svg{width:22px;height:22px;fill:var(--primary-fg)}
+        .t{font-size:11px;font-weight:600;color:var(--muted-fg);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}.v{font-size:18px;font-weight:700}.dsc{font-size:13px;color:var(--muted-fg);line-height:1.6}
+        .p{display:none}.p.on{display:block}.ph{display:flex;justify-content:space-between;margin-bottom:6px;font-size:12px;color:var(--muted-fg)}.bar{width:100%;height:6px;background:var(--muted);border-radius:999px;overflow:hidden}.fill{height:100%;width:0%;background:var(--primary);border-radius:999px;transition:width 0.3s}
+        .btns{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:4px}.b{padding:9px 16px;border-radius:calc(var(--radius) - 2px);border:1px solid transparent;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+        .b-skip{background:transparent;color:oklch(0.62 0.23 25);border-color:color-mix(in oklch, oklch(0.62 0.23 25) 30%, transparent);margin-right:auto}.b-sec{background:var(--secondary);color:oklch(0.98 0 0);border-color:var(--border)}.b-pri{background:var(--primary);color:var(--primary-fg)}.b-pri:disabled{opacity:0.45;cursor:not-allowed}
+        </style></head><body><div class="d">
+        <div class="h"><div class="i"><svg viewBox="0 0 24 24"><path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3zm-1 14.5v-2h2v2h-2zm0-4V7h2v5.5h-2z"/></svg></div>
+        <div style="flex:1"><div class="t">Update Available</div><div class="v" id="version">Checking…</div></div></div>
+        <div class="dsc" id="description">A new version of CRAS is ready.</div>
+        <div class="p" id="progress"><div class="ph"><span id="progress-text">Downloading…</span><span id="progress-percent">0%</span></div><div class="bar"><div class="fill" id="progress-fill"></div></div></div>
+        <div class="btns"><button class="b b-skip" id="btn-skip">Skip this version</button><button class="b b-sec" id="btn-later" style="display:none">Later</button><button class="b b-pri" id="btn-restart" disabled>Restart & Install</button></div>
+        </div><script>
+        var v=document.getElementById('version'),d=document.getElementById('description'),p=document.getElementById('progress'),pp=document.getElementById('progress-percent'),pt=document.getElementById('progress-text'),pf=document.getElementById('progress-fill'),br=document.getElementById('btn-restart'),bl=document.getElementById('btn-later'),bs=document.getElementById('btn-skip');
+        function s(){if(!window.electronAPI) return setTimeout(s,100);
+        window.electronAPI.onUpdateInfo(function(a){v.textContent='v'+a.version;if(a.status==='downloaded'){d.textContent='Update downloaded and ready to install. Restart to apply.';p.classList.remove('on');br.disabled=false;bs.style.display='none';bl.style.display='inline-block';bl.textContent='Close';pf.style.width='100%';pp.textContent='100%';pt.textContent='Ready to install';}else{v.textContent='v'+a.version;d.textContent='Downloading update… You can continue working.';p.classList.add('on');br.disabled=true;}});
+        window.electronAPI.onUpdateProgress(function(a){p.classList.add('on');pf.style.width=a.percent+'%';pp.textContent=a.percent+'%';pt.textContent=a.percent<100?'Downloading…':'Download complete';});
+        br.addEventListener('click',function(e){e.preventDefault();if(!br.disabled) window.electronAPI.updateRestart();});
+        bl.addEventListener('click',function(e){e.preventDefault();window.electronAPI.updateLater();});
+        bs.addEventListener('click',function(e){e.preventDefault();window.electronAPI.updateSkip();});}
+        s();<\/script></body></html>`)}`,
     );
   }
 
