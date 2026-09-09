@@ -1,5 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { Activity, Users, BarChart3, MessageSquareText, Shield, PlusCircle, Bell, BookOpen, Info, UserCircle, CalendarDays, Folder } from "lucide-react";
+import { Activity, Users, BarChart3, MessageSquareText, Shield, PlusCircle, Bell, BookOpen, Info, UserCircle, CalendarDays, Folder, Mail } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -162,6 +162,14 @@ export function AppSidebar() {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
+            <SidebarMenuButton asChild>
+              <a href="mailto:maina350p@gmail.com" target="_blank" rel="noopener noreferrer">
+                <Mail className="h-4 w-4" />
+                <span>Contact Support</span>
+              </a>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
             <SidebarMenuButton asChild isActive={path === "/profile"}>
               <Link to="/profile">
                 <UserCircle className="h-4 w-4" />
@@ -174,10 +182,13 @@ export function AppSidebar() {
           </SidebarMenuItem>
         </SidebarMenu>
         {version && (
-          <div className="px-2 pb-2 text-center">
+          <div className="px-2 pb-1 text-center">
             <span className="text-[10px] text-muted-foreground">v{version}</span>
           </div>
         )}
+        <div className="px-2 pb-2 text-center">
+          <a href="mailto:maina350p@gmail.com" target="_blank" rel="noopener noreferrer" className="text-[10px] text-muted-foreground hover:text-primary underline underline-offset-2">maina350p@gmail.com</a>
+        </div>
       </SidebarFooter>
     </Sidebar>
   );
