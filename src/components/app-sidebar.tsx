@@ -23,7 +23,9 @@ export function AppSidebar() {
   const { data } = useCurrentUser();
   const { toggle } = useAIDrawer();
   const path = useRouterState({ select: (r) => r.location.pathname });
-  const [version, setVersion] = useState<string>("");
+  // Manual hardcode fallback — update when you bump package.json
+  const HARDCODED_VERSION = "1.0.51";
+  const [version, setVersion] = useState<string>(HARDCODED_VERSION);
 
   const companyId = data?.company?.id;
 
