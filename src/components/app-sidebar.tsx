@@ -182,13 +182,10 @@ export function AppSidebar() {
           </SidebarMenuItem>
         </SidebarMenu>
         {version && (
-          <div className="px-2 pb-1 text-center">
+          <div className="px-2 pb-2 text-center">
             <span className="text-[10px] text-muted-foreground">v{version}</span>
           </div>
         )}
-        <div className="px-2 pb-2 text-center">
-          <a href="mailto:maina350p@gmail.com" target="_blank" rel="noopener noreferrer" className="text-[10px] text-muted-foreground hover:text-primary underline underline-offset-2">maina350p@gmail.com</a>
-        </div>
       </SidebarFooter>
     </Sidebar>
   );
