@@ -1184,30 +1184,33 @@ function FollowUpSection({ clientId, clientStatus, reloadTrigger }: { clientId: 
 
   const reload = () => {
     if (!u?.user) return;
-    getActiveFollowUps(u.user.id)
-      .then(ups => {
-        const filtered = ups.filter(f => f.client_id === clientId);
-        setFollowUps(filtered);
-        // Fetch most recent log per follow-up to determine cycle state
-        return import("@/lib/follow-ups").then(m =>
-          m.getFollowUpLogs(clientId).then(logs => {
-            const latestByFollowUp: Record<string, string | null> = {};
-            for (const f of filtered) latestByFollowUp[f.id] = null;
-            for (const log of logs) {
-              // log.follow_up_id links to the follow-up
-              const fid = (log as any).follow_up_id;
-              if (!fid || !(fid in latestByFollowUp)) continue;
-              const existing = latestByFollowUp[fid];
-              if (!existing || new Date(log.logged_at) > new Date(existing)) {
-                latestByFollowUp[fid] = log.logged_at;
+    // Use company-aware query for self-hosted (deities) routing
+    import("@/hooks/use-current-user").then(async ({ useCurrentUser }) => {
+      // Fallback: try to get companyId via direct query if useCurrentUser not available here
+      const companyId = (await import("@/lib/db").then(m => m.query("select company_id from profiles where id = $1", [u.user!.id]).then(r => (r.data as any[])?.[0]?.company_id))) ?? null;
+      getActiveFollowUps(u.user!.id, companyId)
+        .then(ups => {
+          const filtered = ups.filter(f => f.client_id === clientId);
+          setFollowUps(filtered);
+          return import("@/lib/follow-ups").then(m =>
+            m.getFollowUpLogs(clientId, companyId).then(logs => {
+              const latestByFollowUp: Record<string, string | null> = {};
+              for (const f of filtered) latestByFollowUp[f.id] = null;
+              for (const log of logs) {
+                const fid = (log as any).follow_up_id;
+                if (!fid || !(fid in latestByFollowUp)) continue;
+                const existing = latestByFollowUp[fid];
+                if (!existing || new Date(log.logged_at) > new Date(existing)) {
+                  latestByFollowUp[fid] = log.logged_at;
+                }
               }
-            }
-            setLastLoggedAt(latestByFollowUp);
-            setLogs(logs);
-          })
-        );
-      })
-      .catch(console.error);
+              setLastLoggedAt(latestByFollowUp);
+              setLogs(logs);
+            })
+          );
+        })
+        .catch(console.error);
+    });
   };
 
   useEffect(() => { reload(); }, [u?.user?.id, clientId, reloadTrigger]);
@@ -1225,7 +1228,10 @@ function FollowUpSection({ clientId, clientStatus, reloadTrigger }: { clientId: 
     await withLoading(followUp.id, async () => {
       const { logFollowUp } = await import("@/lib/follow-ups");
       const note = pendingNote[followUp.id]?.trim() || null;
-      const updated = await logFollowUp(followUp, pendingActivity[followUp.id], note);
+      const { query } = await import("@/lib/db");
+      const profRes = await query("select company_id from profiles where id = $1", [followUp.user_id]);
+      const companyId = (profRes.data as any[])?.[0]?.company_id ?? null;
+      const updated = await logFollowUp(followUp, pendingActivity[followUp.id], note, companyId);
       const now = new Date().toISOString();
       setFollowUps(prev => prev.map(f => f.id === followUp.id ? { ...f, next_reminder: updated.next_reminder } : f));
       setLastLoggedAt(prev => ({ ...prev, [followUp.id]: now }));
@@ -1233,14 +1239,17 @@ function FollowUpSection({ clientId, clientStatus, reloadTrigger }: { clientId: 
       setPendingNote(prev => { const n = { ...prev }; delete n[followUp.id]; return n; });
       // Refresh log list
       const { getFollowUpLogs } = await import("@/lib/follow-ups");
-      setLogs(await getFollowUpLogs(clientId));
+      setLogs(await getFollowUpLogs(clientId, companyId));
       toast.success(`Logged — next reminder ${new Date(updated.next_reminder).toLocaleDateString()}`);
     });
   };
 
   const handleDone = async (id: string) => {
     await withLoading(id, async () => {
-      await completeFollowUp(id);
+      const { query } = await import("@/lib/db");
+      const fu = followUps.find(f => f.id === id);
+      const companyId = fu ? (await query("select company_id from profiles where id = $1", [fu.user_id]).then(r => (r.data as any[])?.[0]?.company_id)) ?? null : null;
+      await completeFollowUp(id, companyId);
       setFollowUps(prev => prev.filter(f => f.id !== id));
       toast.success("Follow-up marked complete");
     });
@@ -1248,7 +1257,10 @@ function FollowUpSection({ clientId, clientStatus, reloadTrigger }: { clientId: 
 
   const handleStop = async (id: string) => {
     await withLoading(id, async () => {
-      await cancelFollowUp(id);
+      const { query } = await import("@/lib/db");
+      const fu = followUps.find(f => f.id === id);
+      const companyId = fu ? (await query("select company_id from profiles where id = $1", [fu.user_id]).then(r => (r.data as any[])?.[0]?.company_id)) ?? null : null;
+      await cancelFollowUp(id, companyId);
       setFollowUps(prev => prev.filter(f => f.id !== id));
       toast.success("Follow-up stopped");
     });
@@ -1258,8 +1270,11 @@ function FollowUpSection({ clientId, clientStatus, reloadTrigger }: { clientId: 
     if (!u?.user?.id) return;
     setSubscribing(true);
     try {
+      const { query } = await import("@/lib/db");
+      const profRes = await query("select company_id from profiles where id = $1", [u.user.id]);
+      const companyId = (profRes.data as any[])?.[0]?.company_id ?? null;
       const customDays = subFrequency === "custom" ? parseInt(subCustomDays) || 1 : undefined;
-      const fu = await createFollowUp(clientId, u.user.id, subFrequency, subNote.trim() || null, customDays);
+      const fu = await createFollowUp(clientId, u.user.id, subFrequency, subNote.trim() || null, customDays, companyId);
       setFollowUps([fu]);
       setSubNote("");
       toast.success("Follow-up reminder set");

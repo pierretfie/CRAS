@@ -114,6 +114,7 @@ function NewClient() {
   const [interestScale, setInterestScale] = useState(5);
   const [followUpEnabled, setFollowUpEnabled] = useState(false);
   const [followUpFrequency, setFollowUpFrequency] = useState("daily");
+  const [followUpCustomDays, setFollowUpCustomDays] = useState("2");
   const [followUpNote, setFollowUpNote] = useState("");
   const [directActivityType, setDirectActivityType] = useState("");
 
@@ -233,11 +234,12 @@ function NewClient() {
 
         if (followUpEnabled) {
           try {
-            await createFollowUp(client.id, u.user.id, followUpFrequency, followUpNote.trim() || null, undefined, companyId);
+            const customDays = followUpFrequency === "custom" ? parseInt(followUpCustomDays) || 1 : undefined;
+            await createFollowUp(client.id, u.user.id, followUpFrequency, followUpNote.trim() || null, customDays, companyId);
             toast.success("Client created with follow-up scheduled");
-          } catch {
+          } catch (e: any) {
             toast.success("Client created");
-            toast.error("Failed to schedule follow-up");
+            toast.error(e?.message ?? "Failed to schedule follow-up");
           }
         } else {
           toast.success("Client created");
@@ -414,6 +416,17 @@ function NewClient() {
                   </SelectContent>
                 </Select>
               </Field>
+              {followUpFrequency === "custom" && (
+                <Field label="Custom interval (days)">
+                  <Input
+                    type="number"
+                    min={1}
+                    value={followUpCustomDays}
+                    onChange={(e) => setFollowUpCustomDays(e.target.value)}
+                    placeholder="e.g. 5"
+                  />
+                </Field>
+              )}
               <Field label="Note (optional)">
                 <Input
                   placeholder="What to follow up about..."
